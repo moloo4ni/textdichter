@@ -57,4 +57,4 @@ Early development, not ready for daily use yet.
 
 ## License
 
-[Mozilla Public License 2.0](LICENSE)
+[MPL-2.0](LICENSE).
