@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify source
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed base-devel cmake ninja git qt6-base qt6-svg qt6-tools cmark
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Verify tag matches project version
+        shell: bash
+        run: |
+          version=$(sed -n 's/^project(textdichter VERSION \([^ )]*\).*/\1/p' CMakeLists.txt)
+          if [[ "${GITHUB_REF_NAME}" != "v${version}" && "${GITHUB_REF_NAME}" != "v${version}-"* ]]; then
+            echo "tag ${GITHUB_REF_NAME} does not match project version ${version}" >&2
+            exit 1
+          fi
+      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+
+  release:
+    name: Publish GitHub release
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          sparse-checkout: RELEASE_NOTES.md
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_flags=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "Textdichter ${GITHUB_REF_NAME}" \
+              --notes-file RELEASE_NOTES.md \
+              "${release_flags[@]}"
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              --verify-tag \
+              --title "Textdichter ${GITHUB_REF_NAME}" \
+              --notes-file RELEASE_NOTES.md \
+              "${release_flags[@]}"
+          fi

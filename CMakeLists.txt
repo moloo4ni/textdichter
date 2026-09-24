@@ -30,6 +30,7 @@ target_link_libraries(textdichter_core PUBLIC Qt6::Widgets Qt6::PrintSupport Pkg
 
 qt_add_executable(textdichter src/main.cpp)
 target_link_libraries(textdichter PRIVATE textdichter_core)
+qt_add_resources(textdichter icons PREFIX /icons BASE data/icons FILES data/icons/textdichter.svg)
 
 if(Qt6LinguistTools_FOUND)
     qt_add_translations(textdichter SOURCE_TARGETS textdichter textdichter_core TS_FILE_DIR translations)
@@ -46,4 +47,7 @@ if(BUILD_TESTING AND Qt6Test_FOUND)
     set_tests_properties(textdichter_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
+include(GNUInstallDirs)
 install(TARGETS textdichter)
+install(FILES data/textdichter.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES data/icons/textdichter.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)

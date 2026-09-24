@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test on Arch Linux
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed base-devel cmake ninja git qt6-base qt6-svg qt6-tools cmark
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+      - run: DESTDIR=staging cmake --install build
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE" && git diff --check

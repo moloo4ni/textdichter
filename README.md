@@ -40,20 +40,23 @@ keyboard layout.
 
 ## Building
 
-Requirements: Qt 6 (Widgets, PrintSupport, LinguistTools), cmark, CMake 3.21+.
+Requirements: Qt 6.5+ (Widgets, PrintSupport, Svg, LinguistTools), cmark, CMake 3.21+.
 
 ```sh
 # Arch Linux
-sudo pacman -S --needed qt6-base qt6-tools cmark cmake
+sudo pacman -S --needed qt6-base qt6-svg qt6-tools cmark cmake
 
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build build
 ./build/textdichter [file.md]
 ```
 
+`sudo cmake --install build` installs the editor with its icon and a desktop
+entry, so it shows up in the application menu and opens `.md` files.
+
 ## Status
 
-Early development, not ready for daily use yet.
+Pre-release. Everything described above works, but expect rough edges.
 
 ## License
 

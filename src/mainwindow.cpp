@@ -284,7 +284,7 @@ void MainWindow::createMenus()
 
     QMenu *help = menuBar()->addMenu(tr("&Help"));
     help->addAction(tr("CommonMark &Cheat Sheet"), this, &MainWindow::showCheatSheet);
-    help->addAction(tr("&About Textdichter"), this, &MainWindow::showAbout);
+    help->addAction(tr("&About"), this, &MainWindow::showAbout);
 }
 
 void MainWindow::createStatusBar()
@@ -760,7 +760,7 @@ void MainWindow::showCheatSheet()
 
 void MainWindow::showAbout()
 {
-    QMessageBox::about(this, tr("About Textdichter"),
+    QMessageBox::about(this, tr("About"),
                        tr("<p><b>Textdichter</b> %1</p>"
                           "<p>A light, simple and clean Markdown editor. CommonMark only.</p>"
                           "<p>cmark %2 · Qt %3</p>")

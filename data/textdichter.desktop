@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Textdichter
+GenericName=Markdown Editor
+GenericName[ru]=Редактор Markdown
+Comment=A light, simple and clean Markdown editor
+Comment[ru]=Лёгкий, простой и чистый редактор Markdown
+Exec=textdichter %f
+Icon=textdichter
+Terminal=false
+MimeType=text/markdown;
+Categories=Utility;TextEditor;
+Keywords=Markdown;CommonMark;Text;Editor;
+Keywords[ru]=Markdown;CommonMark;Текст;Редактор;

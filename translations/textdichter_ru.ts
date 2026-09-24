@@ -282,9 +282,9 @@
         <translation>&amp;Шпаргалка по CommonMark</translation>
     </message>
     <message>
-        <location filename="../src/mainwindow.cpp" line="287"/>
-        <source>&amp;About Textdichter</source>
-        <translation>&amp;О программе Textdichter</translation>
+        <location filename="../src/mainwindow.cpp" line="763"/>
+        <source>About</source>
+        <translation>О программе</translation>
     </message>
     <message>
         <location filename="../src/mainwindow.cpp" line="310"/>
@@ -350,6 +350,11 @@
         <location filename="../src/mainwindow.cpp" line="306"/>
         <source>Unsaved Changes</source>
         <translation>Несохранённые изменения</translation>
+    </message>
+    <message>
+        <location filename="../src/mainwindow.cpp" line="287"/>
+        <source>&amp;About</source>
+        <translation>&amp;О программе</translation>
     </message>
     <message>
         <location filename="../src/mainwindow.cpp" line="307"/>
@@ -499,11 +504,6 @@ separate them with an empty line</source>
         <location filename="../src/mainwindow.cpp" line="746"/>
         <source>CommonMark Cheat Sheet</source>
         <translation>Шпаргалка по CommonMark</translation>
-    </message>
-    <message>
-        <location filename="../src/mainwindow.cpp" line="763"/>
-        <source>About Textdichter</source>
-        <translation>О программе Textdichter</translation>
     </message>
     <message>
         <location filename="../src/mainwindow.cpp" line="764"/>

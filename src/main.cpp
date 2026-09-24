@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QIcon>
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QTranslator>
@@ -12,6 +13,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("textdichter"));
     app.setApplicationVersion(QStringLiteral(TEXTDICHTER_VERSION));
     app.setDesktopFileName(QStringLiteral("textdichter"));
+    app.setWindowIcon(QIcon(QStringLiteral(":/icons/textdichter.svg")));
 
     // Qt's own strings (standard buttons, file dialogs) and ours.
     QTranslator qtTranslator;
