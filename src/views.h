@@ -1,11 +1,22 @@
 #pragma once
 
+#include <QColor>
 #include <QFontDatabase>
 #include <QFontMetrics>
 #include <QPlainTextEdit>
 #include <QTextBrowser>
 
 #include <algorithm>
+
+class Highlighter;
+
+// A color between two others: 0 gives `from`, 1 gives `to`.
+inline QColor mix(const QColor &from, const QColor &to, qreal t)
+{
+    return QColor::fromRgbF(from.redF() + (to.redF() - from.redF()) * t,
+                            from.greenF() + (to.greenF() - from.greenF()) * t,
+                            from.blueF() + (to.blueF() - from.blueF()) * t);
+}
 
 // Width of the text column, in characters of the monospace font.
 constexpr int kColumnChars = 72;
@@ -79,12 +90,24 @@ class Editor : public Centered<QPlainTextEdit>
 public:
     explicit Editor(QWidget *parent = nullptr);
 
+    // The source exactly as typed. toPlainText() is not: it turns non-breaking
+    // spaces into spaces and U+2028 into line breaks.
+    QString text() const;
+
     // Lines are 1-based, as in the source file.
     int cursorLine() const;
 
     // Puts the line at the top of the view. The cursor stays where it is unless
     // it would end up off screen.
     void scrollToLine(int line);
+
+protected:
+    void changeEvent(QEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void insertFromMimeData(const QMimeData *source) override;
+
+private:
+    Highlighter *m_highlighter;
 };
 
 // The "Preview" mode: the rendered document, read-only.

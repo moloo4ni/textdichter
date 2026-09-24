@@ -12,6 +12,11 @@ pkg_check_modules(CMARK REQUIRED IMPORTED_TARGET libcmark)
 
 # Everything but main(), shared by the application and the tests.
 qt_add_library(textdichter_core STATIC
+    src/editing.cpp src/editing.h
+    src/findbar.cpp src/findbar.h
+    src/formatting.cpp src/formatting.h
+    src/highlighter.cpp src/highlighter.h
+    src/lines.h
     src/mainwindow.cpp src/mainwindow.h
     src/markdown.cpp src/markdown.h
     src/textfile.cpp src/textfile.h

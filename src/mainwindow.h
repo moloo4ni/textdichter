@@ -5,6 +5,7 @@
 #include <QMainWindow>
 
 class Editor;
+class FindBar;
 class Preview;
 class QAction;
 class QLabel;
@@ -69,6 +70,7 @@ private:
     Editor *m_editor;
     Preview *m_preview;
     QStackedWidget *m_stack;
+    FindBar *m_findBar;
 
     QLabel *m_fileLabel;
     QLabel *m_infoLabel;
@@ -80,7 +82,9 @@ private:
     QAction *m_redoAction = nullptr;
     QAction *m_cutAction = nullptr;
     QAction *m_pasteAction = nullptr;
+    QAction *m_replaceAction = nullptr;
     QAction *m_statusBarAction = nullptr;
+    QList<QAction *> m_formatActions; // enabled in the code only
 
     QString m_path; // empty for an untitled document
     TextFile m_file; // line endings and BOM of the open file; text is in the editor

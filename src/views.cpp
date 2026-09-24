@@ -1,16 +1,27 @@
 #include "views.h"
 
+#include "editing.h"
+#include "highlighter.h"
 #include "markdown.h"
 
 #include <QAbstractTextDocumentLayout>
+#include <QKeyEvent>
+#include <QMimeData>
 #include <QScrollBar>
 #include <QTextBlock>
 
 Editor::Editor(QWidget *parent)
     : Centered<QPlainTextEdit>(parent)
+    , m_highlighter(new Highlighter(document()))
 {
     setFrameShape(QFrame::NoFrame);
     setBaseFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    m_highlighter->setPalette(palette());
+}
+
+QString Editor::text() const
+{
+    return document()->toRawText().replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
 }
 
 int Editor::cursorLine() const
@@ -24,6 +35,55 @@ void Editor::scrollToLine(int line)
     verticalScrollBar()->setValue(line - 1);
     if (!viewport()->rect().contains(cursorRect().center()))
         setTextCursor(QTextCursor(document()->findBlockByNumber(line - 1)));
+}
+
+void Editor::changeEvent(QEvent *event)
+{
+    Centered<QPlainTextEdit>::changeEvent(event);
+    if (event->type() == QEvent::PaletteChange)
+        m_highlighter->setPalette(palette());
+}
+
+void Editor::keyPressEvent(QKeyEvent *event)
+{
+    QTextCursor cursor = textCursor();
+    const auto handled = [&](bool done) {
+        if (done)
+            setTextCursor(cursor);
+        return done;
+    };
+    const Qt::KeyboardModifiers modifiers = event->modifiers() & ~Qt::KeypadModifier;
+    switch (event->key()) {
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (modifiers == Qt::NoModifier && handled(editing::continueBlock(cursor)))
+            return;
+        // Shift+Enter would insert U+2028, which is not a line break in a file.
+        if (modifiers == Qt::ShiftModifier) {
+            insertPlainText(QStringLiteral("\n"));
+            return;
+        }
+        break;
+    case Qt::Key_Tab:
+        if (modifiers == Qt::NoModifier && handled(editing::indentListItems(cursor, false)))
+            return;
+        break;
+    case Qt::Key_Backtab:
+        if (handled(editing::indentListItems(cursor, true)))
+            return;
+        break;
+    }
+    Centered<QPlainTextEdit>::keyPressEvent(event);
+}
+
+void Editor::insertFromMimeData(const QMimeData *source)
+{
+    QTextCursor cursor = textCursor();
+    if (source->hasText() && editing::linkSelection(cursor, source->text())) {
+        setTextCursor(cursor);
+        return;
+    }
+    Centered<QPlainTextEdit>::insertFromMimeData(source);
 }
 
 Preview::Preview(QWidget *parent)
@@ -74,18 +134,12 @@ int Preview::topLine() const
 
 QString Preview::styleSheet(const QColor &base, const QColor &text)
 {
-    const auto mix = [&](qreal t) {
-        return QColor::fromRgbF(base.redF() + (text.redF() - base.redF()) * t,
-                                base.greenF() + (text.greenF() - base.greenF()) * t,
-                                base.blueF() + (text.blueF() - base.blueF()) * t)
-            .name();
-    };
     // QTextBrowser supports neither border-left nor padding here, so quotes are
     // told apart by a dimmed color and code blocks by a background.
     return QStringLiteral("code, pre { font-family: '%1'; }"
                           "pre { background-color: %2; }"
                           "blockquote { color: %3; }")
-        .arg(QFontDatabase::systemFont(QFontDatabase::FixedFont).family(), mix(0.08), mix(0.65));
+        .arg(QFontDatabase::systemFont(QFontDatabase::FixedFont).family(), mix(base, text, 0.08).name(), mix(base, text, 0.65).name());
 }
 
 void Preview::changeEvent(QEvent *event)

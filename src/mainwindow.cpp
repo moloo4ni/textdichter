@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 
+#include "findbar.h"
+#include "formatting.h"
 #include "markdown.h"
 #include "views.h"
 
@@ -22,6 +24,7 @@
 #include <QRegularExpression>
 #include <QScrollBar>
 #include <QSettings>
+#include <QShortcut>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QTextDocument>
@@ -29,6 +32,8 @@
 #include <QVBoxLayout>
 
 #include <cmark.h>
+
+#include <functional>
 
 namespace {
 
@@ -66,13 +71,27 @@ MainWindow::MainWindow(QWidget *parent)
     , m_editor(new Editor(this))
     , m_preview(new Preview(this))
     , m_stack(new QStackedWidget(this))
+    , m_findBar(new FindBar(this))
     , m_fileLabel(new QLabel(this))
     , m_infoLabel(new QLabel(this))
     , m_statusTimer(new QTimer(this))
 {
     m_stack->addWidget(m_editor);
     m_stack->addWidget(m_preview);
-    setCentralWidget(m_stack);
+    auto *central = new QWidget(this);
+    auto *layout = new QVBoxLayout(central);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(m_stack);
+    layout->addWidget(m_findBar);
+    setCentralWidget(central);
+
+    m_findBar->setView(m_editor);
+    connect(m_findBar, &FindBar::closed, this, [this] { m_stack->currentWidget()->setFocus(); });
+    connect(new QShortcut(Qt::Key_Escape, this), &QShortcut::activated, this, [this] {
+        if (m_findBar->isVisible())
+            m_findBar->dismiss();
+    });
 
     createMenus();
     createStatusBar();
@@ -146,6 +165,46 @@ void MainWindow::createMenus()
         else
             m_preview->selectAll();
     });
+    edit->addSeparator();
+    edit->addAction(tr("&Find…"), QKeySequence::Find, m_findBar, &FindBar::showFind);
+    edit->addAction(tr("Find &Next"), QKeySequence::FindNext, m_findBar, &FindBar::findNext);
+    edit->addAction(tr("Find Pre&vious"), QKeySequence::FindPrevious, m_findBar, &FindBar::findPrevious);
+    m_replaceAction = edit->addAction(tr("R&eplace…"), QKeySequence(Qt::CTRL | Qt::Key_H), m_findBar,
+                                      &FindBar::showReplace);
+
+    QMenu *format = menuBar()->addMenu(tr("F&ormat"));
+    const auto addFormat = [this](QMenu *menu, const QString &text, const QKeySequence &key,
+                                  std::function<void(QTextCursor &)> command) {
+        m_formatActions.append(menu->addAction(text, key, this, [this, command] {
+            QTextCursor cursor = m_editor->textCursor();
+            command(cursor);
+            m_editor->setTextCursor(cursor);
+        }));
+    };
+    const auto wrap = [](const QString &marker) {
+        return [marker](QTextCursor &cursor) { formatting::toggleInline(cursor, marker); };
+    };
+    const auto prefix = [](formatting::LinePrefix prefix) {
+        return [prefix](QTextCursor &cursor) { formatting::toggleLinePrefix(cursor, prefix); };
+    };
+    addFormat(format, tr("&Bold"), QKeySequence::Bold, wrap(QStringLiteral("**")));
+    addFormat(format, tr("&Italic"), QKeySequence::Italic, wrap(QStringLiteral("*")));
+    addFormat(format, tr("&Code"), QKeySequence(Qt::CTRL | Qt::Key_E), wrap(QStringLiteral("`")));
+    addFormat(format, tr("&Link"), QKeySequence(Qt::CTRL | Qt::Key_K), formatting::insertLink);
+    format->addSeparator();
+    QMenu *heading = format->addMenu(tr("&Heading"));
+    for (int level = 1; level <= 6; ++level) {
+        addFormat(heading, tr("Heading &%1").arg(level), QKeySequence(Qt::CTRL | (Qt::Key_0 + level)),
+                  [level](QTextCursor &cursor) { formatting::setHeading(cursor, level); });
+    }
+    heading->addSeparator();
+    addFormat(heading, tr("&Normal Text"), QKeySequence(Qt::CTRL | Qt::Key_0),
+              [](QTextCursor &cursor) { formatting::setHeading(cursor, 0); });
+    format->addSeparator();
+    addFormat(format, tr("&Quote"), {}, prefix(formatting::LinePrefix::Quote));
+    addFormat(format, tr("B&ulleted List"), {}, prefix(formatting::LinePrefix::Bullet));
+    addFormat(format, tr("&Numbered List"), {}, prefix(formatting::LinePrefix::Numbered));
+    addFormat(format, tr("Code &Block"), {}, formatting::wrapCodeBlock);
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     m_previewAction = view->addAction(tr("&Preview"));
@@ -297,7 +356,7 @@ bool MainWindow::saveAs()
 bool MainWindow::saveTo(const QString &path)
 {
     TextFile file = m_file;
-    file.text = m_editor->toPlainText();
+    file.text = m_editor->text();
     QString error;
     if (!file.write(path, &error)) {
         QMessageBox::warning(this, tr("Cannot Save File"),
@@ -329,7 +388,7 @@ void MainWindow::exportHtml()
 
     const QString path = dialog.selectedFiles().first();
     const QString title = m_path.isEmpty() ? tr("Untitled") : info.completeBaseName();
-    const TextFile html{markdown::toStandaloneHtml(m_editor->toPlainText(), title)};
+    const TextFile html{markdown::toStandaloneHtml(m_editor->text(), title)};
     QString error;
     if (!html.write(path, &error)) {
         QMessageBox::warning(this, tr("Cannot Export"),
@@ -341,7 +400,7 @@ void MainWindow::exportHtml()
 void MainWindow::copyAsHtml()
 {
     // The selection in code mode, the whole document otherwise.
-    QString source = m_editor->toPlainText();
+    QString source = m_editor->text();
     if (m_mode == Mode::Code && m_editor->textCursor().hasSelection())
         source = m_editor->textCursor().selectedText().replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
 
@@ -364,7 +423,7 @@ void MainWindow::print()
     document.setDefaultFont(QFontDatabase::systemFont(QFontDatabase::GeneralFont));
     document.setDefaultStyleSheet(Preview::styleSheet(Qt::white, Qt::black));
     document.setBaseUrl(baseUrl());
-    document.setHtml(markdown::toHtml(m_editor->toPlainText()));
+    document.setHtml(markdown::toHtml(m_editor->text()));
     document.print(&printer);
 }
 
@@ -374,11 +433,12 @@ void MainWindow::setMode(Mode mode)
         if (mode == Mode::Preview) {
             const int line = m_editor->cursorLine();
             m_editorScrollOnEntry = m_editor->verticalScrollBar()->value();
-            m_preview->render(m_editor->toPlainText(), baseUrl());
+            m_preview->render(m_editor->text(), baseUrl());
             m_stack->setCurrentWidget(m_preview);
             m_preview->scrollToLine(line);
             m_preview->resetScrolledByUser();
             m_preview->setFocus();
+            m_findBar->setView(m_preview);
         } else {
             // Without scrolling in the preview, going back must not move anything.
             const int line = m_preview->topLine();
@@ -388,6 +448,7 @@ void MainWindow::setMode(Mode mode)
             else
                 m_editor->verticalScrollBar()->setValue(m_editorScrollOnEntry);
             m_editor->setFocus();
+            m_findBar->setView(m_editor);
         }
         m_mode = mode;
     }
@@ -467,7 +528,7 @@ void MainWindow::updateTitle()
 void MainWindow::updateStatus()
 {
     const QString mode = m_mode == Mode::Code ? tr("Code") : tr("Preview");
-    m_infoLabel->setText(tr("%n word(s)", nullptr, countWords(m_editor->toPlainText()))
+    m_infoLabel->setText(tr("%n word(s)", nullptr, countWords(m_editor->text()))
                          + QStringLiteral(" · ") + mode);
 }
 
@@ -478,6 +539,9 @@ void MainWindow::updateActions()
     m_redoAction->setEnabled(code && m_editor->document()->isRedoAvailable());
     m_cutAction->setEnabled(code);
     m_pasteAction->setEnabled(code);
+    m_replaceAction->setEnabled(code);
+    for (QAction *action : std::as_const(m_formatActions))
+        action->setEnabled(code);
 
     m_previewAction->setChecked(!code);
 }
