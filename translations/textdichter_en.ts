@@ -15,7 +15,7 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
-        <location filename="../src/mainwindow.cpp" line="531"/>
+        <location filename="../src/mainwindow.cpp" line="705"/>
         <source>%n word(s)</source>
         <translation>
             <numerusform>%n word</numerusform>

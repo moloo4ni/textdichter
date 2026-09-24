@@ -34,6 +34,8 @@ int main(int argc, char *argv[])
     MainWindow window;
     if (!parser.positionalArguments().isEmpty())
         window.openFromCommandLine(parser.positionalArguments().first());
+    else
+        window.recoverUntitled();
     window.show();
     return app.exec();
 }

@@ -1,3 +1,5 @@
+#include "backup.h"
+#include "banner.h"
 #include "editing.h"
 #include "findbar.h"
 #include "formatting.h"
@@ -13,9 +15,11 @@
 #include <QMenuBar>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextBlock>
 #include <QTest>
+#include <QTimer>
 #include <QTextLayout>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -63,6 +67,26 @@ bool isBold(const QTextCharFormat &format)
     return format.fontWeight() == QFont::Bold;
 }
 
+void writeFile(const QString &path, const QByteArray &bytes)
+{
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(bytes);
+}
+
+void clickBanner(MainWindow &window, const QString &button)
+{
+    auto *banner = window.findChild<Banner *>();
+    QVERIFY(!banner->isHidden());
+    for (auto *b : banner->findChildren<QPushButton *>()) {
+        if (!b->isHidden() && b->text() == button) {
+            b->click();
+            return;
+        }
+    }
+    QFAIL(qPrintable(u"No button "_s + button));
+}
+
 QString edited(QString text, const std::function<void(QTextCursor &)> &command)
 {
     const QChar open(0x27E8), close(0x27E9), bar(QLatin1Char('|'));
@@ -97,6 +121,18 @@ class Tests : public QObject
     Q_OBJECT
 
 private slots:
+    void initTestCase()
+    {
+        // Backups go to a test folder, not to the real state folder.
+        QStandardPaths::setTestModeEnabled(true);
+        QDir(Backup::directory()).removeRecursively();
+    }
+
+    void cleanupTestCase()
+    {
+        QDir(Backup::directory()).removeRecursively();
+    }
+
     void textFileRoundTrip_data()
     {
         QTest::addColumn<QByteArray>("bytes");
@@ -636,6 +672,158 @@ private slots:
         cursor.setPosition(3);
         cursor.insertText(u"\n==="_s);
         QCOMPARE(styled(doc->firstBlock(), isBold), u"one"_s);
+    }
+
+    void backupLifecycle()
+    {
+        const QString path = u"/tmp/textdichter-test/notes.md"_s;
+        {
+            Backup backup(path);
+            QVERIFY(!backup.exists());
+            backup.write(u"changes"_s);
+            Backup otherWindow(path);
+            QVERIFY(!otherWindow.exists()); // held by a running window
+            otherWindow.write(u"lost"_s);
+        } // a crash leaves the backup without its lock
+        {
+            Backup backup(path);
+            QVERIFY(backup.exists());
+            QCOMPARE(backup.text(), u"changes"_s);
+            QVERIFY(backup.time().isValid());
+            backup.remove();
+            QVERIFY(!backup.exists());
+        }
+        QVERIFY(!Backup(path).exists());
+    }
+
+    void backupUntitled()
+    {
+        QVERIFY(!Backup::takeUntitled());
+        Backup(QString()).write(u"untitled"_s);
+        auto backup = Backup::takeUntitled();
+        QVERIFY(backup);
+        QCOMPARE(backup->text(), u"untitled"_s);
+        QVERIFY(!Backup::takeUntitled()); // taken
+        backup->remove();
+        backup.reset();
+        QVERIFY(!Backup::takeUntitled());
+    }
+
+    // The window backs up unsaved changes and removes the backup on save.
+    void windowBackups()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(u"file.md"_s);
+        writeFile(path, "text\n");
+        const auto backups = [] { return QDir(Backup::directory()).entryList({u"*.md"_s}, QDir::Files); };
+
+        MainWindow window;
+        window.openFromCommandLine(path);
+        window.findChild<QTimer *>(u"backupTimer"_s)->setInterval(0);
+        auto *editor = window.findChild<QPlainTextEdit *>();
+        editor->insertPlainText(u"more "_s);
+        QTRY_COMPARE(backups().size(), 1);
+        QCOMPARE(Backup(path).exists(), false); // the window holds it
+
+        editor->undo();
+        QTRY_COMPARE(backups().size(), 0); // back to the saved text
+
+        editor->insertPlainText(u"more "_s);
+        QTRY_COMPARE(backups().size(), 1);
+        for (QAction *action : window.menuBar()->findChildren<QAction *>()) {
+            if (action->shortcut() == QKeySequence::Save)
+                action->trigger();
+        }
+        QCOMPARE(backups().size(), 0);
+    }
+
+    void windowRecovery()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(u"file.md"_s);
+        writeFile(path, "text\n");
+        Backup(path).write(u"text\nrecovered\n"_s);
+
+        MainWindow window;
+        window.openFromCommandLine(path);
+        auto *editor = window.findChild<QPlainTextEdit *>();
+        QCOMPARE(editor->toPlainText(), u"text\n"_s);
+        clickBanner(window, u"Restore"_s);
+        QCOMPARE(editor->toPlainText(), u"text\nrecovered\n"_s);
+        QVERIFY(editor->document()->isModified());
+        editor->undo();
+        QCOMPARE(editor->toPlainText(), u"text\n"_s);
+
+        // A backup equal to the file is not offered.
+        Backup(path).remove();
+        MainWindow other;
+        Backup(path).write(u"text\n"_s);
+        other.openFromCommandLine(path);
+        QVERIFY(other.findChild<Banner *>()->isHidden());
+        QVERIFY(!Backup(path).exists());
+
+        // Deleting the backup.
+        Backup(path).write(u"other\n"_s);
+        MainWindow third;
+        third.openFromCommandLine(path);
+        clickBanner(third, u"Delete"_s);
+        QCOMPARE(third.findChild<QPlainTextEdit *>()->toPlainText(), u"text\n"_s);
+        QVERIFY(!Backup(path).exists());
+    }
+
+    void untitledRecovery()
+    {
+        Backup(QString()).write(u"lost text"_s);
+        MainWindow window;
+        window.recoverUntitled();
+        clickBanner(window, u"Restore"_s);
+        QCOMPARE(window.findChild<QPlainTextEdit *>()->toPlainText(), u"lost text"_s);
+        window.findChild<QPlainTextEdit *>()->document()->setModified(false); // removes the backup
+        QVERIFY(!Backup::takeUntitled());
+    }
+
+    void fileChangedOnDisk()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(u"file.md"_s);
+        writeFile(path, "one\n");
+
+        MainWindow window;
+        window.openFromCommandLine(path);
+        auto *banner = window.findChild<Banner *>();
+        auto *editor = window.findChild<QPlainTextEdit *>();
+
+        // Our own save and a touch without changes do not count.
+        editor->insertPlainText(u"zero "_s);
+        for (QAction *action : window.menuBar()->findChildren<QAction *>()) {
+            if (action->shortcut() == QKeySequence::Save)
+                action->trigger();
+        }
+        writeFile(path, "zero one\n");
+        QTest::qWait(500);
+        QVERIFY(banner->isHidden());
+
+        writeFile(path, "two\n");
+        QTRY_VERIFY(!banner->isHidden());
+        clickBanner(window, u"Reload"_s);
+        QCOMPARE(editor->toPlainText(), u"two\n"_s);
+        QVERIFY(!editor->document()->isModified());
+        editor->undo();
+        QCOMPARE(editor->toPlainText(), u"zero one\n"_s);
+
+        // Replaced by a rename, as many editors save.
+        writeFile(dir.filePath(u"new.md"_s), "three\n");
+        QFile::remove(path);
+        QFile::rename(dir.filePath(u"new.md"_s), path);
+        QTRY_VERIFY(!banner->isHidden());
+        QCOMPARE(banner->text(), u"The file has changed on disk."_s);
+        clickBanner(window, u"Ignore"_s);
+        QTest::qWait(500);
+        QVERIFY(banner->isHidden());
+
+        QFile::remove(path);
+        QTRY_VERIFY(!banner->isHidden());
+        QVERIFY(banner->text().contains(u"deleted"_s));
     }
 
     void newFileFromCommandLine()

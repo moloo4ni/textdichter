@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 
+#include "backup.h"
+#include "banner.h"
 #include "findbar.h"
 #include "formatting.h"
 #include "markdown.h"
@@ -8,12 +10,14 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
+#include <QCryptographicHash>
 #include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -64,6 +68,11 @@ int countWords(const QString &text)
     return count;
 }
 
+QByteArray hashOf(const QString &text)
+{
+    return QCryptographicHash::hash(text.toUtf8(), QCryptographicHash::Sha1);
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -72,9 +81,13 @@ MainWindow::MainWindow(QWidget *parent)
     , m_preview(new Preview(this))
     , m_stack(new QStackedWidget(this))
     , m_findBar(new FindBar(this))
+    , m_banner(new Banner(this))
     , m_fileLabel(new QLabel(this))
     , m_infoLabel(new QLabel(this))
     , m_statusTimer(new QTimer(this))
+    , m_watcher(new QFileSystemWatcher(this))
+    , m_diskTimer(new QTimer(this))
+    , m_backupTimer(new QTimer(this))
 {
     m_stack->addWidget(m_editor);
     m_stack->addWidget(m_preview);
@@ -82,6 +95,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+    layout->addWidget(m_banner);
     layout->addWidget(m_stack);
     layout->addWidget(m_findBar);
     setCentralWidget(central);
@@ -107,6 +121,31 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_statusTimer, &QTimer::timeout, this, &MainWindow::updateStatus);
     connect(m_editor, &QPlainTextEdit::textChanged, m_statusTimer, qOverload<>(&QTimer::start));
 
+    // Editors that save by renaming replace the file, so its folder is watched
+    // too. Saving takes a few steps; look once they are done.
+    m_diskTimer->setSingleShot(true);
+    m_diskTimer->setInterval(200);
+    connect(m_watcher, &QFileSystemWatcher::fileChanged, m_diskTimer, qOverload<>(&QTimer::start));
+    connect(m_watcher, &QFileSystemWatcher::directoryChanged, m_diskTimer, qOverload<>(&QTimer::start));
+    connect(m_diskTimer, &QTimer::timeout, this, &MainWindow::checkDisk);
+
+    // A backup a few seconds after a change, not on every keystroke.
+    m_backupTimer->setObjectName(QStringLiteral("backupTimer"));
+    m_backupTimer->setSingleShot(true);
+    m_backupTimer->setInterval(3000);
+    connect(m_backupTimer, &QTimer::timeout, this, &MainWindow::writeBackup);
+    connect(m_editor->document(), &QTextDocument::contentsChanged, this, [this] {
+        if (!m_backupTimer->isActive())
+            m_backupTimer->start();
+    });
+    connect(m_editor->document(), &QTextDocument::modificationChanged, this, [this](bool modified) {
+        if (modified)
+            return;
+        m_backupTimer->stop();
+        if (m_backup && !m_recoveryPending)
+            m_backup->remove();
+    });
+
     // A dropped file opens in this window instead of being inserted as text.
     m_preview->setAcceptDrops(true);
     m_editor->viewport()->installEventFilter(this);
@@ -121,9 +160,21 @@ MainWindow::MainWindow(QWidget *parent)
     updateActions();
 }
 
+MainWindow::~MainWindow() = default;
+
 void MainWindow::openFromCommandLine(const QString &path)
 {
     openFile(path, true);
+}
+
+void MainWindow::recoverUntitled()
+{
+    if (!m_path.isEmpty() || m_editor->document()->isModified())
+        return;
+    if (auto backup = Backup::takeUntitled()) {
+        m_backup = std::move(backup);
+        offerRecovery();
+    }
 }
 
 void MainWindow::createMenus()
@@ -264,7 +315,11 @@ bool MainWindow::confirmDiscard()
     box.exec();
     if (box.clickedButton() == saveButton)
         return save();
-    return box.clickedButton() == dontSave;
+    if (box.clickedButton() != dontSave)
+        return false;
+    if (m_backup && !m_recoveryPending)
+        m_backup->remove();
+    return true;
 }
 
 void MainWindow::newDocument()
@@ -331,6 +386,14 @@ void MainWindow::setDocument(const QString &path, const TextFile &file)
     m_editorScrollOnEntry = 0;
     updateTitle();
     updateStatus();
+
+    m_diskHash = QFileInfo::exists(path) ? hashOf(file.text) : QByteArray();
+    watchFile();
+    m_banner->hide();
+    m_recoveryPending = false;
+    m_backup = std::make_unique<Backup>(path);
+    if (m_backup->exists())
+        offerRecovery();
 }
 
 bool MainWindow::save()
@@ -364,11 +427,122 @@ bool MainWindow::saveTo(const QString &path)
                                  + QStringLiteral("\n\n") + error);
         return false;
     }
-    m_path = QFileInfo(path).absoluteFilePath();
-    m_editor->document()->setModified(false);
+    const QString previous = std::exchange(m_path, QFileInfo(path).absoluteFilePath());
+    m_diskHash = hashOf(file.text);
+    m_editor->document()->setModified(false); // also removes the backup
+    if (m_path != previous)
+        m_backup = std::make_unique<Backup>(m_path);
+    watchFile();
+    if (!m_recoveryPending)
+        m_banner->hide(); // a change on disk is overwritten now
     addRecent(m_path);
     updateTitle();
     return true;
+}
+
+void MainWindow::replaceText(const QString &text)
+{
+    const int position = m_editor->textCursor().position();
+    const int scroll = m_editor->verticalScrollBar()->value();
+    QTextCursor cursor(m_editor->document());
+    cursor.select(QTextCursor::Document);
+    cursor.insertText(text);
+    cursor.setPosition(std::min(position, m_editor->document()->characterCount() - 1));
+    m_editor->setTextCursor(cursor);
+    m_editor->verticalScrollBar()->setValue(scroll);
+    if (m_mode == Mode::Preview) {
+        const int line = m_preview->topLine();
+        m_preview->render(text, baseUrl());
+        m_preview->scrollToLine(line);
+    }
+    updateStatus();
+}
+
+void MainWindow::watchFile()
+{
+    if (!m_watcher->files().isEmpty())
+        m_watcher->removePaths(m_watcher->files());
+    if (!m_watcher->directories().isEmpty())
+        m_watcher->removePaths(m_watcher->directories());
+    if (m_path.isEmpty())
+        return;
+    m_watcher->addPath(QFileInfo(m_path).absolutePath());
+    if (QFileInfo::exists(m_path))
+        m_watcher->addPath(m_path);
+}
+
+void MainWindow::checkDisk()
+{
+    if (m_path.isEmpty())
+        return;
+    if (!QFileInfo::exists(m_path)) {
+        if (!m_diskHash.isEmpty()) {
+            m_diskHash.clear();
+            m_banner->showMessage(tr("The file has been deleted from disk. Saving creates it again."),
+                                  {{tr("OK"), [] {}}});
+        }
+        return;
+    }
+    // A file replaced by a rename is no longer watched.
+    if (!m_watcher->files().contains(m_path))
+        m_watcher->addPath(m_path);
+
+    // Only a change of the text counts: not a touch, not our own save.
+    QString error;
+    const std::optional<TextFile> file = TextFile::read(m_path, &error);
+    if (!file)
+        return;
+    const QByteArray hash = hashOf(file->text);
+    if (hash == m_diskHash)
+        return;
+    m_banner->showMessage(tr("The file has changed on disk."),
+                          {{tr("Reload"), [this] { reload(); }},
+                           {tr("Ignore"), [this, hash] { m_diskHash = hash; }}});
+}
+
+void MainWindow::reload()
+{
+    QString error;
+    const std::optional<TextFile> file = TextFile::read(m_path, &error);
+    if (!file) {
+        QMessageBox::warning(this, tr("Cannot Open File"),
+                             tr("Cannot open “%1”.").arg(QFileInfo(m_path).fileName())
+                                 + QStringLiteral("\n\n") + error);
+        return;
+    }
+    m_file.crlf = file->crlf;
+    m_file.bom = file->bom;
+    m_diskHash = hashOf(file->text);
+    // Undo brings back the text as it was before reloading.
+    replaceText(file->text);
+    m_editor->document()->setModified(false);
+}
+
+void MainWindow::offerRecovery()
+{
+    const QString text = m_backup->text();
+    if (text == m_editor->text()) {
+        m_backup->remove();
+        return;
+    }
+    m_recoveryPending = true;
+    const QString time = QLocale().toString(m_backup->time(), QLocale::ShortFormat);
+    m_banner->showMessage(tr("Unsaved changes from %1 were found.").arg(time),
+                          {{tr("Restore"),
+                            [this, text] {
+                                m_recoveryPending = false;
+                                replaceText(text);
+                            }},
+                           {tr("Delete"), [this] {
+                                m_recoveryPending = false;
+                                m_backup->remove();
+                            }}});
+}
+
+void MainWindow::writeBackup()
+{
+    if (m_backup && !m_recoveryPending && m_editor->document()->isModified())
+        m_backup->write(m_editor->text());
 }
 
 void MainWindow::exportHtml()

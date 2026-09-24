@@ -4,10 +4,15 @@
 
 #include <QMainWindow>
 
+#include <memory>
+
+class Backup;
+class Banner;
 class Editor;
 class FindBar;
 class Preview;
 class QAction;
+class QFileSystemWatcher;
 class QLabel;
 class QMenu;
 class QStackedWidget;
@@ -21,10 +26,15 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 
     // A path that does not exist yet starts a new document that will be saved
     // under it, as in `textdichter notes.md`.
     void openFromCommandLine(const QString &path);
+
+    // At startup without a file: offers the changes of an untitled document
+    // lost in a crash.
+    void recoverUntitled();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -46,6 +56,14 @@ private:
     bool save();
     bool saveAs();
     bool saveTo(const QString &path);
+    // Replaces the text in one undo step, keeping the place in the document.
+    void replaceText(const QString &text);
+
+    void watchFile();
+    void checkDisk();
+    void reload();
+    void offerRecovery();
+    void writeBackup();
 
     void exportHtml();
     void copyAsHtml();
@@ -71,10 +89,14 @@ private:
     Preview *m_preview;
     QStackedWidget *m_stack;
     FindBar *m_findBar;
+    Banner *m_banner;
 
     QLabel *m_fileLabel;
     QLabel *m_infoLabel;
     QTimer *m_statusTimer;
+    QFileSystemWatcher *m_watcher;
+    QTimer *m_diskTimer;
+    QTimer *m_backupTimer;
     QMenu *m_recentMenu = nullptr;
 
     QAction *m_previewAction = nullptr;
@@ -88,6 +110,9 @@ private:
 
     QString m_path; // empty for an untitled document
     TextFile m_file; // line endings and BOM of the open file; text is in the editor
+    QByteArray m_diskHash; // of the text last read or written; empty if there is no file
+    std::unique_ptr<Backup> m_backup;
+    bool m_recoveryPending = false; // a found backup is offered and must not be overwritten
     Mode m_mode = Mode::Code;
     int m_editorScrollOnEntry = 0;
     int m_zoom = 0;
