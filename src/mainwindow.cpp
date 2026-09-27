@@ -4,6 +4,7 @@
 #include "banner.h"
 #include "bars.h"
 #include "findbar.h"
+#include "formatbar.h"
 #include "formatting.h"
 #include "markdown.h"
 #include "views.h"
@@ -36,6 +37,7 @@
 #include <QTextDocument>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QWidgetAction>
 #include <QtMath>
 
 #include <cmark.h>
@@ -120,6 +122,8 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     createMenus();
+    m_editor->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_editor, &QWidget::customContextMenuRequested, this, &MainWindow::showEditorMenu);
     createStatusBar();
 
     connect(m_editor->document(), &QTextDocument::modificationChanged, this, &MainWindow::updateTitle);
@@ -215,7 +219,7 @@ void MainWindow::createMenus()
     m_redoAction = edit->addAction(tr("&Redo"), QKeySequence::Redo, m_editor, &QPlainTextEdit::redo);
     edit->addSeparator();
     m_cutAction = edit->addAction(tr("Cu&t"), QKeySequence::Cut, m_editor, &QPlainTextEdit::cut);
-    edit->addAction(tr("&Copy"), QKeySequence::Copy, this, [this] {
+    m_copyAction = edit->addAction(tr("&Copy"), QKeySequence::Copy, this, [this] {
         if (m_mode == Mode::Code)
             m_editor->copy();
         else
@@ -224,7 +228,7 @@ void MainWindow::createMenus()
     m_pasteAction = edit->addAction(tr("&Paste"), QKeySequence::Paste, m_editor, &QPlainTextEdit::paste);
     edit->addAction(tr("Copy as &HTML"), this, &MainWindow::copyAsHtml);
     edit->addSeparator();
-    edit->addAction(tr("Select &All"), QKeySequence::SelectAll, this, [this] {
+    m_selectAllAction = edit->addAction(tr("Select &All"), QKeySequence::SelectAll, this, [this] {
         if (m_mode == Mode::Code)
             m_editor->selectAll();
         else
@@ -240,11 +244,22 @@ void MainWindow::createMenus()
     QMenu *format = menuBar()->addMenu(tr("F&ormat"));
     const auto addFormat = [this](QMenu *menu, const QString &text, const QKeySequence &key,
                                   std::function<void(QTextCursor &)> command) {
-        m_formatActions.append(menu->addAction(text, key, this, [this, command] {
+        QAction *action = menu->addAction(text, key, this, [this, command] {
             QTextCursor cursor = m_editor->textCursor();
             command(cursor);
             m_editor->setTextCursor(cursor);
-        }));
+        });
+        // For the buttons of the context menu, which have no text of their own.
+        if (!key.isEmpty())
+            action->setToolTip(QStringLiteral("%1 (%2)").arg(action->iconText(),
+                                                             key.toString(QKeySequence::NativeText)));
+        m_formatActions.append(action);
+        return action;
+    };
+    // The icons show in the context menu only; the menu bar stays text.
+    const auto setIcon = [this](QAction *action, const QString &themeName, const QString &file) {
+        action->setIconVisibleInMenu(false);
+        m_formatIcons.append({action, themeName, QStringLiteral(":/icons/format/%1.svg").arg(file)});
     };
     const auto wrap = [](const QString &marker) {
         return [marker](QTextCursor &cursor) { formatting::toggleInline(cursor, marker); };
@@ -252,10 +267,10 @@ void MainWindow::createMenus()
     const auto prefix = [](formatting::LinePrefix prefix) {
         return [prefix](QTextCursor &cursor) { formatting::toggleLinePrefix(cursor, prefix); };
     };
-    addFormat(format, tr("&Bold"), QKeySequence::Bold, wrap(QStringLiteral("**")));
-    addFormat(format, tr("&Italic"), QKeySequence::Italic, wrap(QStringLiteral("*")));
-    addFormat(format, tr("&Code"), QKeySequence(Qt::CTRL | Qt::Key_E), wrap(QStringLiteral("`")));
-    addFormat(format, tr("&Link"), QKeySequence(Qt::CTRL | Qt::Key_K), formatting::insertLink);
+    QAction *bold = addFormat(format, tr("&Bold"), QKeySequence::Bold, wrap(QStringLiteral("**")));
+    QAction *italic = addFormat(format, tr("&Italic"), QKeySequence::Italic, wrap(QStringLiteral("*")));
+    QAction *code = addFormat(format, tr("&Code"), QKeySequence(Qt::CTRL | Qt::Key_E), wrap(QStringLiteral("`")));
+    QAction *link = addFormat(format, tr("&Link"), QKeySequence(Qt::CTRL | Qt::Key_K), formatting::insertLink);
     format->addSeparator();
     QMenu *heading = format->addMenu(tr("&Heading"));
     for (int level = 1; level <= 6; ++level) {
@@ -266,10 +281,24 @@ void MainWindow::createMenus()
     addFormat(heading, tr("&Normal Text"), QKeySequence(Qt::CTRL | Qt::Key_0),
               [](QTextCursor &cursor) { formatting::setHeading(cursor, 0); });
     format->addSeparator();
-    addFormat(format, tr("&Quote"), {}, prefix(formatting::LinePrefix::Quote));
-    addFormat(format, tr("B&ulleted List"), {}, prefix(formatting::LinePrefix::Bullet));
-    addFormat(format, tr("&Numbered List"), {}, prefix(formatting::LinePrefix::Numbered));
-    addFormat(format, tr("Code &Block"), {}, formatting::wrapCodeBlock);
+    QAction *quote = addFormat(format, tr("&Quote"), {}, prefix(formatting::LinePrefix::Quote));
+    QAction *bullets = addFormat(format, tr("B&ulleted List"), {}, prefix(formatting::LinePrefix::Bullet));
+    QAction *numbers = addFormat(format, tr("&Numbered List"), {}, prefix(formatting::LinePrefix::Numbered));
+    QAction *codeBlock = addFormat(format, tr("Code &Block"), {}, formatting::wrapCodeBlock);
+
+    // Both lists behind one button of the context menu, like the headings.
+    auto *lists = new QMenu(tr("&List"), this);
+    lists->addActions({bullets, numbers});
+    setIcon(bold, QStringLiteral("format-text-bold"), QStringLiteral("bold"));
+    setIcon(italic, QStringLiteral("format-text-italic"), QStringLiteral("italic"));
+    setIcon(code, QStringLiteral("format-text-code"), QStringLiteral("code"));
+    setIcon(link, QStringLiteral("insert-link"), QStringLiteral("link"));
+    // No theme names for these two.
+    setIcon(heading->menuAction(), {}, QStringLiteral("heading"));
+    setIcon(quote, QStringLiteral("format-text-blockquote"), QStringLiteral("quote"));
+    setIcon(lists->menuAction(), QStringLiteral("format-list-unordered"), QStringLiteral("list"));
+    setIcon(codeBlock, {}, QStringLiteral("code-block"));
+    m_formatRows = {{bold, italic, code, link}, {heading->menuAction(), quote, lists->menuAction(), codeBlock}};
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     m_previewAction = view->addAction(tr("&Preview"));
@@ -299,6 +328,40 @@ void MainWindow::createMenus()
     QMenu *help = menuBar()->addMenu(tr("&Help"));
     help->addAction(tr("CommonMark &Cheat Sheet"), this, &MainWindow::showCheatSheet);
     help->addAction(tr("&About"), this, &MainWindow::showAbout);
+}
+
+void MainWindow::showEditorMenu(const QPoint &pos)
+{
+    // A right click outside the selection moves the cursor there first, so
+    // the format applies where the click was.
+    const QTextCursor clicked = m_editor->cursorForPosition(pos);
+    const QTextCursor cursor = m_editor->textCursor();
+    if (!cursor.hasSelection() || clicked.position() < cursor.selectionStart()
+        || clicked.position() > cursor.selectionEnd())
+        m_editor->setTextCursor(clicked);
+
+    // The theme's icons only if it has them all: a set mixed from two styles
+    // looks worse than the bundled one alone. Drawn anew each time, in the
+    // colors of the current theme.
+    const bool themed = std::all_of(m_formatIcons.cbegin(), m_formatIcons.cend(), [](const FormatIcon &icon) {
+        return icon.themeName.isEmpty() || QIcon::hasThemeIcon(icon.themeName);
+    });
+    for (const FormatIcon &icon : std::as_const(m_formatIcons))
+        icon.action->setIcon(formatIcon(themed ? icon.themeName : QString(), icon.file, palette()));
+
+    QMenu menu(this);
+    auto *bar = new FormatBar(m_formatRows, &menu);
+    connect(bar, &FormatBar::triggered, &menu, &QMenu::close);
+    auto *rows = new QWidgetAction(&menu);
+    rows->setDefaultWidget(bar);
+    menu.addAction(rows);
+    menu.addSeparator();
+    menu.addActions({m_undoAction, m_redoAction});
+    menu.addSeparator();
+    menu.addActions({m_cutAction, m_copyAction, m_pasteAction});
+    menu.addSeparator();
+    menu.addAction(m_selectAllAction);
+    menu.exec(m_editor->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::createStatusBar()

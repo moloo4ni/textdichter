@@ -9,9 +9,12 @@
 #include "textfile.h"
 #include "views.h"
 
+#include <QApplication>
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMenuBar>
 #include <QPushButton>
 #include <QScrollBar>
@@ -23,6 +26,8 @@
 #include <QTextLayout>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+#include <functional>
 
 using namespace Qt::StringLiterals;
 
@@ -591,6 +596,57 @@ private slots:
     }
 
     // Non-breaking spaces and U+2028 must survive a save.
+    void editorContextMenu()
+    {
+        MainWindow window;
+        window.show();
+        auto *editor = window.findChild<QPlainTextEdit *>();
+        editor->setPlainText(u"word and more words"_s);
+        QTextCursor cursor(editor->document());
+        cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, 4);
+        editor->setTextCursor(cursor);
+
+        // Right-clicks at a point of the text and runs check() on the open menu.
+        const auto rightClick = [&](int position, const std::function<void(QMenu *)> &check) {
+            QTextCursor at(editor->document());
+            at.setPosition(position);
+            const QPoint pos = editor->cursorRect(at).center();
+            bool opened = false;
+            QTimer::singleShot(0, editor, [&] {
+                auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+                opened = menu;
+                if (menu) {
+                    check(menu);
+                    menu->close();
+                }
+            });
+            QContextMenuEvent event(QContextMenuEvent::Mouse, pos, editor->viewport()->mapToGlobal(pos));
+            QApplication::sendEvent(editor->viewport(), &event);
+            QVERIFY(opened);
+        };
+
+        // Inside the selection: the selection stays, and Bold applies to it.
+        rightClick(2, [&](QMenu *menu) {
+            const QList<QToolButton *> buttons = menu->findChildren<QToolButton *>();
+            QCOMPARE(buttons.size(), 8);
+            QCOMPARE(buttons[0]->toolTip(), QStringLiteral("Bold (%1)").arg(
+                QKeySequence(QKeySequence::Bold).toString(QKeySequence::NativeText)));
+            // The headings and the lists open their menus.
+            QVERIFY(buttons[4]->defaultAction()->menu());
+            QCOMPARE(buttons[6]->defaultAction()->menu()->actions().size(), 2);
+            QCOMPARE(editor->textCursor().selectedText(), u"word"_s);
+            buttons[0]->click();
+            QVERIFY(!menu->isVisible());
+        });
+        QCOMPARE(editor->toPlainText(), u"**word** and more words"_s);
+
+        // Outside it: the cursor moves to the click.
+        rightClick(15, [&](QMenu *) {
+            QVERIFY(!editor->textCursor().hasSelection());
+            QCOMPARE(editor->textCursor().position(), 15);
+        });
+    }
+
     void saveKeepsText()
     {
         QTemporaryDir dir;

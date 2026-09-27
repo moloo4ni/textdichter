@@ -31,6 +31,8 @@ keyboard layout.
 
 - **Format menu** — bold, italic, code, links, headings (`Ctrl+1…6`), quotes,
   lists and code blocks. Applying a format again removes it.
+- **Right-click menu** — the same formats as icon buttons above the usual
+  editing commands, for working with the mouse.
 - **Lists and quotes continue** on Enter; an empty item ends the list. Tab and
   Shift+Tab nest and unnest list items the way CommonMark expects.
 - **Pasting a URL over a selection** turns it into a link.

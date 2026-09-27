@@ -15,6 +15,7 @@ class QAction;
 class QFileSystemWatcher;
 class QLabel;
 class QMenu;
+class QPoint;
 class QStackedWidget;
 class QTimer;
 
@@ -45,6 +46,8 @@ private:
 
     void createMenus();
     void createStatusBar();
+    // The editor's context menu: format buttons on top, then editing.
+    void showEditorMenu(const QPoint &pos);
 
     // Everything that replaces the document asks confirmDiscard() first.
     bool confirmDiscard();
@@ -103,10 +106,19 @@ private:
     QAction *m_undoAction = nullptr;
     QAction *m_redoAction = nullptr;
     QAction *m_cutAction = nullptr;
+    QAction *m_copyAction = nullptr;
     QAction *m_pasteAction = nullptr;
+    QAction *m_selectAllAction = nullptr;
     QAction *m_replaceAction = nullptr;
     QAction *m_statusBarAction = nullptr;
     QList<QAction *> m_formatActions; // enabled in the code only
+    struct FormatIcon {
+        QAction *action;
+        QString themeName; // empty if themes have no such icon
+        QString file; // bundled, for themes without it
+    };
+    QList<FormatIcon> m_formatIcons;
+    QList<QList<QAction *>> m_formatRows; // buttons of the context menu
 
     QString m_path; // empty for an untitled document
     TextFile m_file; // line endings and BOM of the open file; text is in the editor
