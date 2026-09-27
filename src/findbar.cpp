@@ -1,7 +1,10 @@
 #include "findbar.h"
 
+#include "bars.h"
+
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -27,16 +30,24 @@ FindBar::FindBar(QWidget *parent)
         button->setToolTip(toolTip);
         return button;
     };
+    // Icons from the icon theme match the rest of the desktop; the style's own
+    // arrows are tiny and its close icon belongs to title bars.
+    const auto setIcon = [](QToolButton *button, const QString &name, Qt::ArrowType arrow) {
+        if (QIcon::hasThemeIcon(name))
+            button->setIcon(QIcon::fromTheme(name));
+        else
+            button->setArrowType(arrow);
+    };
     QToolButton *previous = toolButton(tr("Previous (%1)").arg(QKeySequence(QKeySequence::FindPrevious).toString(QKeySequence::NativeText)));
-    previous->setArrowType(Qt::UpArrow);
+    setIcon(previous, QStringLiteral("go-up"), Qt::UpArrow);
     QToolButton *next = toolButton(tr("Next (%1)").arg(QKeySequence(QKeySequence::FindNext).toString(QKeySequence::NativeText)));
-    next->setArrowType(Qt::DownArrow);
+    setIcon(next, QStringLiteral("go-down"), Qt::DownArrow);
     m_caseButton = toolButton(tr("Match case"));
     m_caseButton->setObjectName(QStringLiteral("matchCase"));
     m_caseButton->setText(QStringLiteral("Aa"));
     m_caseButton->setCheckable(true);
     QToolButton *close = toolButton(tr("Close (%1)").arg(QKeySequence(Qt::Key_Escape).toString(QKeySequence::NativeText)));
-    close->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
+    close->setIcon(QIcon::fromTheme(QStringLiteral("window-close"), style()->standardIcon(QStyle::SP_DialogCloseButton)));
 
     // Wide enough for a phrase, not the whole window.
     const int fieldWidth = fontMetrics().averageCharWidth() * 32;
@@ -49,11 +60,13 @@ FindBar::FindBar(QWidget *parent)
     m_replace->installEventFilter(this);
 
     auto *layout = new QGridLayout(this);
-    layout->setContentsMargins(6, 4, 6, 4);
+    layout->setContentsMargins(barInset(this), 4, barInset(this), 4);
     layout->setVerticalSpacing(4);
     layout->addWidget(new QLabel(tr("Find:"), this), 0, 0);
     layout->addWidget(m_find, 0, 1);
+    // Some styles give no spacing at all, and buttons stick together.
     auto *findButtons = new QHBoxLayout;
+    findButtons->setSpacing(6);
     findButtons->addWidget(previous);
     findButtons->addWidget(next);
     findButtons->addWidget(m_caseButton);
@@ -63,6 +76,7 @@ FindBar::FindBar(QWidget *parent)
     layout->addWidget(m_replaceLabel, 1, 0);
     layout->addWidget(m_replace, 1, 1);
     auto *replaceButtons = new QHBoxLayout;
+    replaceButtons->setSpacing(6);
     replaceButtons->addWidget(m_replaceButton);
     replaceButtons->addWidget(m_replaceAllButton);
     replaceButtons->addStretch();

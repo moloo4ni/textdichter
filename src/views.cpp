@@ -135,11 +135,14 @@ int Preview::topLine() const
 QString Preview::styleSheet(const QColor &base, const QColor &text)
 {
     // QTextBrowser supports neither border-left nor padding here, so quotes are
-    // told apart by a dimmed color and code blocks by a background.
+    // told apart by a dimmed color and code blocks by a background. A rule is
+    // as dim as markers in Code, not a bright line across the page.
     return QStringLiteral("code, pre { font-family: '%1'; }"
                           "pre { background-color: %2; }"
-                          "blockquote { color: %3; }")
-        .arg(QFontDatabase::systemFont(QFontDatabase::FixedFont).family(), mix(base, text, 0.08).name(), mix(base, text, 0.65).name());
+                          "blockquote { color: %3; }"
+                          "hr { background-color: %4; }")
+        .arg(QFontDatabase::systemFont(QFontDatabase::FixedFont).family(), mix(base, text, 0.08).name(),
+             mix(base, text, 0.65).name(), mix(base, text, 0.45).name());
 }
 
 void Preview::changeEvent(QEvent *event)

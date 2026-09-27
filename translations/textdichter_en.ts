@@ -4,7 +4,7 @@
 <context>
     <name>FindBar</name>
     <message numerus="yes">
-        <location filename="../src/findbar.cpp" line="270"/>
+        <location filename="../src/findbar.cpp" line="284"/>
         <source>%n match(es)</source>
         <translation>
             <numerusform>%n match</numerusform>
@@ -15,7 +15,7 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
-        <location filename="../src/mainwindow.cpp" line="705"/>
+        <location filename="../src/mainwindow.cpp" line="712"/>
         <source>%n word(s)</source>
         <translation>
             <numerusform>%n word</numerusform>

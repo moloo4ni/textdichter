@@ -1,5 +1,7 @@
 #include "banner.h"
 
+#include "bars.h"
+
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -14,6 +16,8 @@ Banner::Banner(QWidget *parent)
     m_label->setWordWrap(true);
 
     auto *layout = new QHBoxLayout(this);
+    const QMargins margins = layout->contentsMargins();
+    layout->setContentsMargins(barInset(this), margins.top(), barInset(this), margins.bottom());
     layout->addWidget(m_label, 1);
     layout->addLayout(m_buttons);
     hide();

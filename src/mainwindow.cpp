@@ -2,6 +2,7 @@
 
 #include "backup.h"
 #include "banner.h"
+#include "bars.h"
 #include "findbar.h"
 #include "formatting.h"
 #include "markdown.h"
@@ -26,6 +27,7 @@
 #include <QPrinter>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QScreen>
 #include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
@@ -34,10 +36,13 @@
 #include <QTextDocument>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QtMath>
 
 #include <cmark.h>
 
+#include <algorithm>
 #include <functional>
+#include <memory>
 
 namespace {
 
@@ -290,6 +295,8 @@ void MainWindow::createMenus()
 void MainWindow::createStatusBar()
 {
     statusBar()->setSizeGripEnabled(false);
+    // QStatusBar keeps 2 px before its first item already.
+    statusBar()->setContentsMargins(barInset(this) - 2, 0, barInset(this), 0);
     statusBar()->addWidget(m_fileLabel, 1);
     statusBar()->addPermanentWidget(m_infoLabel);
 
@@ -728,7 +735,8 @@ void MainWindow::showCheatSheet()
         "**Emphasis**  \n"
         "`*italic*` · `**bold**` · `` `code` ``\n\n"
         "**Links and images**  \n"
-        "`[text](https://example.com)` · `<https://example.com>` · `![description](image.png)`\n\n"
+        "`[text](https://example.com)` · `<https://example.com>`  \n"
+        "`![description](image.png)`\n\n"
         "**Lists**  \n"
         "`- item` · `1. item` — indent a line to the item’s text to nest it\n\n"
         "**Quotes**  \n"
@@ -754,7 +762,16 @@ void MainWindow::showCheatSheet()
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addWidget(buttons);
-    dialog.resize(560, 540);
+    // Tall enough for the whole sheet if the screen allows: a cheat sheet that
+    // has to be scrolled is not one. Measured on a copy: until it is shown, the
+    // browser lays its own document out for its default size.
+    const int width = 560;
+    const QMargins margins = layout->contentsMargins();
+    const std::unique_ptr<QTextDocument> measure(browser->document()->clone());
+    measure->setTextWidth(width - margins.left() - margins.right());
+    const int height = qCeil(measure->size().height()) + margins.top() + margins.bottom()
+                       + layout->spacing() + buttons->sizeHint().height();
+    dialog.resize(width, std::min(height, screen()->availableGeometry().height() * 9 / 10));
     dialog.exec();
 }
 
