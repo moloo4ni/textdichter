@@ -92,7 +92,7 @@ Preview::Preview(QWidget *parent)
     setFrameShape(QFrame::NoFrame);
     setOpenLinks(false);
     setBaseFont(QFontDatabase::systemFont(QFontDatabase::GeneralFont));
-    applyStyleSheet();
+    applyStyle();
     connect(verticalScrollBar(), &QScrollBar::actionTriggered, this,
             [this] { m_scrolledByUser = true; });
 }
@@ -132,25 +132,42 @@ int Preview::topLine() const
     return 1;
 }
 
-QString Preview::styleSheet(const QColor &base, const QColor &text)
+void Preview::styleDocument(QTextDocument *document, const QFont &font, const QColor &base,
+                            const QColor &text)
 {
+    // Lists and quotes are indented by the character grid of Code: a quote by
+    // two characters, like "> ", a list by three, like "1. ", since two would
+    // cut off numbers from 10 on. Headings stay close to the text size: Code
+    // has one size for everything, and big headings would make the modes look
+    // unrelated. The sizes are keywords, because headings carry a relative
+    // size step, which wins over a size in points.
+    QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    fixed.setPointSizeF(font.pointSizeF());
+    const qreal advance = QFontMetricsF(fixed).horizontalAdvance(QLatin1Char('m'));
+
+    document->setDefaultFont(font);
+    document->setIndentWidth(3 * advance);
     // QTextBrowser supports neither border-left nor padding here, so quotes are
     // told apart by a dimmed color and code blocks by a background. A rule is
     // as dim as markers in Code, not a bright line across the page.
-    return QStringLiteral("code, pre { font-family: '%1'; }"
-                          "pre { background-color: %2; }"
-                          "blockquote { color: %3; }"
-                          "hr { background-color: %4; }")
-        .arg(QFontDatabase::systemFont(QFontDatabase::FixedFont).family(), mix(base, text, 0.08).name(),
-             mix(base, text, 0.65).name(), mix(base, text, 0.45).name());
+    document->setDefaultStyleSheet(
+        QStringLiteral("h1 { font-size: x-large; }"
+                       "h2 { font-size: large; }"
+                       "h3, h4, h5, h6 { font-size: medium; }"
+                       "code, pre { font-family: '%1'; }"
+                       "pre { background-color: %2; }"
+                       "blockquote { color: %3; margin-left: %4px; margin-right: 0px; }"
+                       "hr { background-color: %5; }")
+            .arg(fixed.family(), mix(base, text, 0.08).name(), mix(base, text, 0.65).name(),
+                 QString::number(qRound(2 * advance)), mix(base, text, 0.45).name()));
 }
 
 void Preview::changeEvent(QEvent *event)
 {
     Centered<QTextBrowser>::changeEvent(event);
-    if (event->type() == QEvent::PaletteChange) {
+    if (event->type() == QEvent::PaletteChange || event->type() == QEvent::FontChange) {
         // The style sheet only applies on setHtml(), so render again.
-        applyStyleSheet();
+        applyStyle();
         if (!m_source.isNull()) {
             const int line = topLine();
             render(m_source, m_baseUrl);
@@ -159,8 +176,7 @@ void Preview::changeEvent(QEvent *event)
     }
 }
 
-void Preview::applyStyleSheet()
+void Preview::applyStyle()
 {
-    document()->setDefaultStyleSheet(
-        styleSheet(palette().color(QPalette::Base), palette().color(QPalette::Text)));
+    styleDocument(document(), font(), palette().color(QPalette::Base), palette().color(QPalette::Text));
 }

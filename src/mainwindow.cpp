@@ -601,8 +601,8 @@ void MainWindow::print()
 
     // Paper is white regardless of the screen theme.
     QTextDocument document;
-    document.setDefaultFont(QFontDatabase::systemFont(QFontDatabase::GeneralFont));
-    document.setDefaultStyleSheet(Preview::styleSheet(Qt::white, Qt::black));
+    Preview::styleDocument(&document, QFontDatabase::systemFont(QFontDatabase::GeneralFont), Qt::white,
+                           Qt::black);
     document.setBaseUrl(baseUrl());
     document.setHtml(markdown::toHtml(m_editor->text()));
     document.print(&printer);
@@ -755,8 +755,8 @@ void MainWindow::showCheatSheet()
     auto *layout = new QVBoxLayout(&dialog);
     auto *browser = new QTextBrowser(&dialog);
     browser->setFrameShape(QFrame::NoFrame);
-    browser->document()->setDefaultStyleSheet(
-        Preview::styleSheet(palette().color(QPalette::Base), palette().color(QPalette::Text)));
+    Preview::styleDocument(browser->document(), browser->font(), palette().color(QPalette::Base),
+                           palette().color(QPalette::Text));
     browser->setHtml(markdown::toHtml(sheet));
     layout->addWidget(browser);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);

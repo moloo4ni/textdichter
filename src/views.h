@@ -143,15 +143,17 @@ public:
     bool scrolledByUser() const { return m_scrolledByUser; }
     void resetScrolledByUser() { m_scrolledByUser = false; }
 
-    // Style sheet for rendered Markdown in the given colors. Rich text CSS has
-    // no palette(), so the colors are computed here.
-    static QString styleSheet(const QColor &base, const QColor &text);
+    // Styles a document for rendered Markdown in the given font and colors.
+    // Applies on the next setHtml(). Rich text CSS has no palette() and no em,
+    // so colors and sizes are computed here.
+    static void styleDocument(QTextDocument *document, const QFont &font, const QColor &base,
+                              const QColor &text);
 
 protected:
     void changeEvent(QEvent *event) override;
 
 private:
-    void applyStyleSheet();
+    void applyStyle();
 
     QList<int> m_anchorLines;
     QString m_source;
