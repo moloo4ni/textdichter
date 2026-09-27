@@ -631,6 +631,12 @@ private slots:
         QCOMPARE(lines[9].marker, -1);
         // An unclosed fence runs to the end.
         QVERIFY(Highlighter::parse(u"```\n# a"_s).at(1).kind == Kind::Code);
+        // cmark ends a setext heading on the next line even when that line
+        // is another block.
+        const QList<Highlighter::Line> setext = Highlighter::parse(u"a\nb\n===\n# c"_s);
+        QVERIFY(setext[1].kind == Kind::Heading);
+        QVERIFY(setext[2].kind == Kind::HeadingUnderline);
+        QVERIFY(setext[3].kind == Kind::Heading);
     }
 
     void highlighterStyles()

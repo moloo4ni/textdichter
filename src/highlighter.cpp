@@ -94,11 +94,13 @@ QList<Highlighter::Line> Highlighter::parse(const QString &source)
             lines[first].marker = qint16(column);
             break;
         case CMARK_NODE_HEADING: {
-            // cmark ends a setext heading on the blank line after it, if any.
-            int end = last;
-            while (end > first && text[end].trimmed().isEmpty())
-                --end;
-            if (end > first) { // setext: the text, then a line of = or -
+            // cmark ends a setext heading on the line after it, so the
+            // underline is found by its look: the first line of = or -.
+            static const QRegularExpression underline(QStringLiteral(R"(^(?: {0,3}> ?)* {0,3}(?:=+|-+)[ \t]*$)"));
+            int end = first + 1;
+            while (end <= last && !underline.match(text[end]).hasMatch())
+                ++end;
+            if (end <= last) { // setext: the text, then a line of = or -
                 set(first, end - 1, Kind::Heading);
                 lines[end].kind = Kind::HeadingUnderline;
             } else {
