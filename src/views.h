@@ -4,6 +4,7 @@
 #include <QFontDatabase>
 #include <QFontMetrics>
 #include <QPlainTextEdit>
+#include <QScrollBar>
 #include <QTextBrowser>
 #include <QtMath>
 
@@ -35,6 +36,9 @@ public:
         // column does not look like a card on the window.
         this->setBackgroundRole(QPalette::Base);
         this->setAutoFillBackground(true);
+        // The scroll bar comes and goes with the length of the text.
+        QObject::connect(this->verticalScrollBar(), &QScrollBar::rangeChanged, this,
+                         [this] { updateColumn(); });
     }
 
     void setBaseFont(const QFont &font)
@@ -80,8 +84,13 @@ private:
         // wider than its characters by that margin on both sides.
         const qreal chars = QFontMetricsF(fixed).horizontalAdvance(QLatin1Char('m')) * kColumnChars;
         const int column = qCeil(chars + 2 * this->document()->documentMargin());
-        const int side = std::max(0, (this->width() - column) / 2);
-        this->setViewportMargins(side, 0, side, 0);
+        // The column is centered in the window, and a scroll bar takes its
+        // width from the right margin rather than from the column.
+        const QScrollBar *bar = this->verticalScrollBar();
+        const int barWidth = bar->maximum() > bar->minimum() ? bar->sizeHint().width() : 0;
+        const int left = std::max(0, (this->width() - column) / 2);
+        const int right = std::max(0, this->width() - barWidth - column - left);
+        this->setViewportMargins(left, 0, right, 0);
     }
 
     QFont m_baseFont;
