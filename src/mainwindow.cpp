@@ -159,7 +159,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     QSettings settings;
     if (!restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray()))
-        resize(900, 700);
+        // As wide as the text column, so a floating window has no empty
+        // sides; three quarters of the screen high.
+        resize(m_editor->sizeHint().width(), screen()->availableGeometry().height() * 3 / 4);
 
     setDocument({}, {});
     updateActions();

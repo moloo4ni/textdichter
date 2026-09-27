@@ -55,6 +55,12 @@ public:
         applyZoom();
     }
 
+    // Just wide enough for the column and a scroll bar.
+    QSize sizeHint() const override
+    {
+        return {columnWidth() + this->verticalScrollBar()->sizeHint().width(), Base::sizeHint().height()};
+    }
+
 protected:
     void resizeEvent(QResizeEvent *event) override
     {
@@ -77,25 +83,36 @@ private:
         this->setFont(font);
     }
 
-    void updateColumn()
+    // The monospace font at the current zoom: it sets the grid in both modes.
+    QFontMetricsF gridMetrics() const
     {
         QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
         fixed.setPointSizeF(this->font().pointSizeF());
-        const QFontMetricsF metrics(fixed);
-        // A line of air above the text and below it, in both modes alike. It
-        // is the document's own margin, so it scrolls away with the text.
-        const qreal margin = std::round(metrics.lineSpacing());
+        return QFontMetricsF(fixed);
+    }
+
+    // A line of air around the text, in both modes alike. It is the
+    // document's own margin, so it scrolls away with the text.
+    qreal textMargin() const { return std::round(gridMetrics().lineSpacing()); }
+
+    // The column is wider than its characters by the margin on both sides.
+    int columnWidth() const
+    {
+        return qCeil(gridMetrics().horizontalAdvance(QLatin1Char('m')) * kColumnChars + 2 * textMargin());
+    }
+
+    void updateColumn()
+    {
+        const qreal margin = textMargin();
         if (this->document()->documentMargin() != margin)
             this->document()->setDocumentMargin(margin);
-        // The margin is on the sides too, so the column is wider than its
-        // characters by the margin on both sides.
-        const qreal chars = metrics.horizontalAdvance(QLatin1Char('m')) * kColumnChars;
-        const int column = qCeil(chars + 2 * this->document()->documentMargin());
         // The column is centered in the window, and a scroll bar takes its
-        // width from the right margin rather than from the column.
+        // width from the right margin rather than from the column. With no
+        // room for both, the column moves left.
+        const int column = columnWidth();
         const QScrollBar *bar = this->verticalScrollBar();
         const int barWidth = bar->maximum() > bar->minimum() ? bar->sizeHint().width() : 0;
-        const int left = std::max(0, (this->width() - column) / 2);
+        const int left = std::clamp((this->width() - column) / 2, 0, std::max(0, this->width() - barWidth - column));
         const int right = std::max(0, this->width() - barWidth - column - left);
         this->setViewportMargins(left, 0, right, 0);
     }
