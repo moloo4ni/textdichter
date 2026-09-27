@@ -13,8 +13,7 @@ FormatBar::FormatBar(const QList<QList<QAction *>> &rows, QWidget *parent)
 {
     auto *grid = new QGridLayout(this);
     grid->setSpacing(0);
-    // Toolbar-sized icons: easier to hit, and themes draw some of these icons
-    // at 16 px as something else entirely.
+    // Toolbar-sized icons are easier to hit.
     const int size = style()->pixelMetric(QStyle::PM_ToolBarIconSize, nullptr, this);
     int columns = 0;
     for (int row = 0; row < rows.size(); ++row) {
@@ -37,13 +36,10 @@ FormatBar::FormatBar(const QList<QList<QAction *>> &rows, QWidget *parent)
     grid->setColumnStretch(columns, 1);
 }
 
-QIcon formatIcon(const QString &themeName, const QString &fallback, const QPalette &palette)
+QIcon formatIcon(const QString &file, const QPalette &palette)
 {
-    if (!themeName.isEmpty() && QIcon::hasThemeIcon(themeName))
-        return QIcon::fromTheme(themeName);
-
-    // The bundled icons are black shapes, painted over in the text color.
-    const QIcon source(fallback);
+    // The icons are black shapes, painted over in the text color.
+    const QIcon source(file);
     QIcon icon;
     for (const int size : {16, 22, 32, 44, 64}) {
         for (const auto &[mode, group] : {std::pair(QIcon::Normal, QPalette::Active),

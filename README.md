@@ -62,4 +62,5 @@ Pre-release. Everything described above works, but expect rough edges.
 
 ## License
 
-[MPL-2.0](LICENSE).
+[MPL-2.0](LICENSE). The format icons are from [Lucide](https://lucide.dev)
+([ISC](data/icons/format/LICENSE)).

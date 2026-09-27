@@ -21,6 +21,5 @@ signals:
     void triggered();
 };
 
-// The theme's icon of that name or, if the theme has none, the bundled one
-// drawn in the palette's text color.
-QIcon formatIcon(const QString &themeName, const QString &fallback, const QPalette &palette);
+// A bundled icon, drawn in the palette's text color.
+QIcon formatIcon(const QString &file, const QPalette &palette);

@@ -1,3 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M9.5 12.5l3-3M10 7.5l1.25-1.25a2.83 2.83 0 0 1 4 4L14 11.5M12 14.5l-1.25 1.25a2.83 2.83 0 0 1-4-4L8 10.5" stroke-width="1.5"/>
+<!-- @license lucide-static v1.48.0 - ISC -->
+<svg
+  class="lucide lucide-link"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="#000"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
 </svg>

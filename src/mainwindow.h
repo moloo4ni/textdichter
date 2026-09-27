@@ -5,6 +5,7 @@
 #include <QMainWindow>
 
 #include <memory>
+#include <utility>
 
 class Backup;
 class Banner;
@@ -112,12 +113,7 @@ private:
     QAction *m_replaceAction = nullptr;
     QAction *m_statusBarAction = nullptr;
     QList<QAction *> m_formatActions; // enabled in the code only
-    struct FormatIcon {
-        QAction *action;
-        QString themeName; // empty if themes have no such icon
-        QString file; // bundled, for themes without it
-    };
-    QList<FormatIcon> m_formatIcons;
+    QList<std::pair<QAction *, QString>> m_formatIcons; // the actions' icon files
     QList<QList<QAction *>> m_formatRows; // buttons of the context menu
 
     QString m_path; // empty for an untitled document

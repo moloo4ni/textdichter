@@ -256,10 +256,11 @@ void MainWindow::createMenus()
         m_formatActions.append(action);
         return action;
     };
-    // The icons show in the context menu only; the menu bar stays text.
-    const auto setIcon = [this](QAction *action, const QString &themeName, const QString &file) {
+    // Lucide icons, one set whatever the theme. They show in the context menu
+    // only; the menu bar stays text.
+    const auto setIcon = [this](QAction *action, const QString &name) {
         action->setIconVisibleInMenu(false);
-        m_formatIcons.append({action, themeName, QStringLiteral(":/icons/format/%1.svg").arg(file)});
+        m_formatIcons.append({action, QStringLiteral(":/icons/format/%1.svg").arg(name)});
     };
     const auto wrap = [](const QString &marker) {
         return [marker](QTextCursor &cursor) { formatting::toggleInline(cursor, marker); };
@@ -289,15 +290,14 @@ void MainWindow::createMenus()
     // Both lists behind one button of the context menu, like the headings.
     auto *lists = new QMenu(tr("&List"), this);
     lists->addActions({bullets, numbers});
-    setIcon(bold, QStringLiteral("format-text-bold"), QStringLiteral("bold"));
-    setIcon(italic, QStringLiteral("format-text-italic"), QStringLiteral("italic"));
-    setIcon(code, QStringLiteral("format-text-code"), QStringLiteral("code"));
-    setIcon(link, QStringLiteral("insert-link"), QStringLiteral("link"));
-    // No theme names for these two.
-    setIcon(heading->menuAction(), {}, QStringLiteral("heading"));
-    setIcon(quote, QStringLiteral("format-text-blockquote"), QStringLiteral("quote"));
-    setIcon(lists->menuAction(), QStringLiteral("format-list-unordered"), QStringLiteral("list"));
-    setIcon(codeBlock, {}, QStringLiteral("code-block"));
+    setIcon(bold, QStringLiteral("bold"));
+    setIcon(italic, QStringLiteral("italic"));
+    setIcon(code, QStringLiteral("code"));
+    setIcon(link, QStringLiteral("link"));
+    setIcon(heading->menuAction(), QStringLiteral("heading"));
+    setIcon(quote, QStringLiteral("quote"));
+    setIcon(lists->menuAction(), QStringLiteral("list"));
+    setIcon(codeBlock, QStringLiteral("code-block"));
     m_formatRows = {{bold, italic, code, link}, {heading->menuAction(), quote, lists->menuAction(), codeBlock}};
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
@@ -340,14 +340,9 @@ void MainWindow::showEditorMenu(const QPoint &pos)
         || clicked.position() > cursor.selectionEnd())
         m_editor->setTextCursor(clicked);
 
-    // The theme's icons only if it has them all: a set mixed from two styles
-    // looks worse than the bundled one alone. Drawn anew each time, in the
-    // colors of the current theme.
-    const bool themed = std::all_of(m_formatIcons.cbegin(), m_formatIcons.cend(), [](const FormatIcon &icon) {
-        return icon.themeName.isEmpty() || QIcon::hasThemeIcon(icon.themeName);
-    });
-    for (const FormatIcon &icon : std::as_const(m_formatIcons))
-        icon.action->setIcon(formatIcon(themed ? icon.themeName : QString(), icon.file, palette()));
+    // Drawn anew each time, in the colors of the current theme.
+    for (const auto &[action, file] : std::as_const(m_formatIcons))
+        action->setIcon(formatIcon(file, palette()));
 
     QMenu menu(this);
     auto *bar = new FormatBar(m_formatRows, &menu);
