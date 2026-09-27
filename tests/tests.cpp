@@ -27,6 +27,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <functional>
 
 using namespace Qt::StringLiterals;
@@ -658,6 +659,13 @@ private slots:
             QCOMPARE(menu->actions()[5]->menu()->actions().size(), 8); // six levels, a line, normal text
             QCOMPARE(texts(menu->actions()[7]->menu()), (QStringList{u"B&ulleted List"_s, u"&Numbered List"_s}));
         });
+
+        // The Format menu of the menu bar is in the same order.
+        const QList<QAction *> bar = window.menuBar()->actions();
+        const auto format = std::find_if(bar.begin(), bar.end(),
+                                         [](QAction *action) { return action->text() == u"F&ormat"_s; });
+        QVERIFY(format != bar.end());
+        QCOMPARE(texts((*format)->menu()), items.mid(0, 9));
     }
 
     // Non-breaking spaces and U+2028 must survive a save.

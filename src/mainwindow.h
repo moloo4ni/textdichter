@@ -111,7 +111,7 @@ private:
     QAction *m_selectAllAction = nullptr;
     QAction *m_replaceAction = nullptr;
     QAction *m_statusBarAction = nullptr;
-    QList<QAction *> m_contextFormats; // the top of the context menu
+    QMenu *m_formatMenu = nullptr; // also the top of the context menu
     QList<QAction *> m_formatActions; // enabled in the code only
 
     QString m_path; // empty for an untitled document

@@ -239,7 +239,7 @@ void MainWindow::createMenus()
     m_replaceAction = edit->addAction(tr("R&eplace…"), QKeySequence(Qt::CTRL | Qt::Key_H), m_findBar,
                                       &FindBar::showReplace);
 
-    QMenu *format = menuBar()->addMenu(tr("F&ormat"));
+    QMenu *format = m_formatMenu = menuBar()->addMenu(tr("F&ormat"));
     const auto addFormat = [this](QMenu *menu, const QString &text, const QKeySequence &key,
                                   std::function<void(QTextCursor &)> command) {
         QAction *action = menu->addAction(text, key, this, [this, command] {
@@ -248,7 +248,6 @@ void MainWindow::createMenus()
             m_editor->setTextCursor(cursor);
         });
         m_formatActions.append(action);
-        return action;
     };
     const auto wrap = [](const QString &marker) {
         return [marker](QTextCursor &cursor) { formatting::toggleInline(cursor, marker); };
@@ -256,10 +255,10 @@ void MainWindow::createMenus()
     const auto prefix = [](formatting::LinePrefix prefix) {
         return [prefix](QTextCursor &cursor) { formatting::toggleLinePrefix(cursor, prefix); };
     };
-    QAction *bold = addFormat(format, tr("&Bold"), QKeySequence::Bold, wrap(QStringLiteral("**")));
-    QAction *italic = addFormat(format, tr("&Italic"), QKeySequence::Italic, wrap(QStringLiteral("*")));
-    QAction *code = addFormat(format, tr("&Code"), QKeySequence(Qt::CTRL | Qt::Key_E), wrap(QStringLiteral("`")));
-    QAction *link = addFormat(format, tr("&Link"), QKeySequence(Qt::CTRL | Qt::Key_K), formatting::insertLink);
+    addFormat(format, tr("&Bold"), QKeySequence::Bold, wrap(QStringLiteral("**")));
+    addFormat(format, tr("&Italic"), QKeySequence::Italic, wrap(QStringLiteral("*")));
+    addFormat(format, tr("&Code"), QKeySequence(Qt::CTRL | Qt::Key_E), wrap(QStringLiteral("`")));
+    addFormat(format, tr("&Link"), QKeySequence(Qt::CTRL | Qt::Key_K), formatting::insertLink);
     format->addSeparator();
     QMenu *heading = format->addMenu(tr("&Heading"));
     for (int level = 1; level <= 6; ++level) {
@@ -269,20 +268,12 @@ void MainWindow::createMenus()
     heading->addSeparator();
     addFormat(heading, tr("&Normal Text"), QKeySequence(Qt::CTRL | Qt::Key_0),
               [](QTextCursor &cursor) { formatting::setHeading(cursor, 0); });
-    format->addSeparator();
-    QAction *quote = addFormat(format, tr("&Quote"), {}, prefix(formatting::LinePrefix::Quote));
-    QAction *bullets = addFormat(format, tr("B&ulleted List"), {}, prefix(formatting::LinePrefix::Bullet));
-    QAction *numbers = addFormat(format, tr("&Numbered List"), {}, prefix(formatting::LinePrefix::Numbered));
-    QAction *codeBlock = addFormat(format, tr("Code &Block"), {}, formatting::wrapCodeBlock);
-
-    // Every format a click away in the context menu; the two lists behind one
-    // item there, like the headings.
-    auto *lists = new QMenu(tr("&List"), this);
-    lists->addActions({bullets, numbers});
-    auto *separator = new QAction(this);
-    separator->setSeparator(true);
-    m_contextFormats = {bold, italic, code, link, separator, heading->menuAction(), quote, lists->menuAction(),
-                        codeBlock};
+    addFormat(format, tr("&Quote"), {}, prefix(formatting::LinePrefix::Quote));
+    // Both lists behind one item, like the headings.
+    QMenu *lists = format->addMenu(tr("&List"));
+    addFormat(lists, tr("B&ulleted List"), {}, prefix(formatting::LinePrefix::Bullet));
+    addFormat(lists, tr("&Numbered List"), {}, prefix(formatting::LinePrefix::Numbered));
+    addFormat(format, tr("Code &Block"), {}, formatting::wrapCodeBlock);
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     m_previewAction = view->addAction(tr("&Preview"));
@@ -325,7 +316,7 @@ void MainWindow::showEditorMenu(const QPoint &pos)
         m_editor->setTextCursor(clicked);
 
     QMenu menu(this);
-    menu.addActions(m_contextFormats);
+    menu.addActions(m_formatMenu->actions());
     menu.addSeparator();
     menu.addActions({m_undoAction, m_redoAction});
     menu.addSeparator();
