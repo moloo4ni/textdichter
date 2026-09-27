@@ -50,6 +50,13 @@ constexpr int kMaxRecentFiles = 10;
 
 const QString kMarkdownFilter = QStringLiteral("Markdown (*.md *.markdown)");
 
+// ~/.config/textdichter/textdichter.conf. The organization is named here rather
+// than for the whole application, which would also nest the backup folder.
+QSettings settings()
+{
+    return QSettings(QStringLiteral("textdichter"), QStringLiteral("textdichter"));
+}
+
 bool isMarkdownPath(const QString &path)
 {
     return path.endsWith(QLatin1String(".md"), Qt::CaseInsensitive)
@@ -157,7 +164,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_preview->viewport()->installEventFilter(this);
     qApp->installEventFilter(this); // Ctrl+/ on non-US layouts, see eventFilter()
 
-    QSettings settings;
+    QSettings settings = ::settings();
     if (!restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray()))
         // As wide as the text column, so a floating window has no empty
         // sides; three quarters of the screen high.
@@ -275,7 +282,7 @@ void MainWindow::createMenus()
     m_statusBarAction->setCheckable(true);
     connect(m_statusBarAction, &QAction::toggled, this, [this](bool visible) {
         statusBar()->setVisible(visible);
-        QSettings().setValue(QStringLiteral("statusBar"), visible);
+        settings().setValue(QStringLiteral("statusBar"), visible);
     });
     view->addSeparator();
     QAction *zoomIn = view->addAction(tr("Zoom &In"), this, [this] { setZoom(m_zoom + 1); });
@@ -302,7 +309,7 @@ void MainWindow::createStatusBar()
     statusBar()->addWidget(m_fileLabel, 1);
     statusBar()->addPermanentWidget(m_infoLabel);
 
-    const bool visible = QSettings().value(QStringLiteral("statusBar"), true).toBool();
+    const bool visible = settings().value(QStringLiteral("statusBar"), true).toBool();
     m_statusBarAction->setChecked(visible);
     statusBar()->setVisible(visible);
 }
@@ -663,7 +670,7 @@ void MainWindow::setZoom(int points)
 
 void MainWindow::addRecent(const QString &path)
 {
-    QSettings settings;
+    QSettings settings = ::settings();
     QStringList recent = settings.value(QStringLiteral("recentFiles")).toStringList();
     recent.removeAll(path);
     recent.prepend(path);
@@ -673,7 +680,7 @@ void MainWindow::addRecent(const QString &path)
 void MainWindow::fillRecentMenu()
 {
     m_recentMenu->clear();
-    const QStringList recent = QSettings().value(QStringLiteral("recentFiles")).toStringList();
+    const QStringList recent = settings().value(QStringLiteral("recentFiles")).toStringList();
     if (recent.isEmpty()) {
         m_recentMenu->addAction(tr("No Recent Files"))->setEnabled(false);
         return;
@@ -686,7 +693,7 @@ void MainWindow::fillRecentMenu()
     m_recentMenu->setToolTipsVisible(true);
     m_recentMenu->addSeparator();
     m_recentMenu->addAction(tr("&Clear Menu"), this,
-                            [] { QSettings().remove(QStringLiteral("recentFiles")); });
+                            [] { settings().remove(QStringLiteral("recentFiles")); });
 }
 
 QString MainWindow::displayName() const
@@ -794,7 +801,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
         event->ignore();
         return;
     }
-    QSettings().setValue(QStringLiteral("geometry"), saveGeometry());
+    settings().setValue(QStringLiteral("geometry"), saveGeometry());
     event->accept();
 }
 
