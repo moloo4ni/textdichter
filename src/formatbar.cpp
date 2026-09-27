@@ -2,10 +2,10 @@
 
 #include <QAction>
 #include <QHBoxLayout>
+#include <QIconEngine>
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
-#include <QStyle>
 #include <QToolButton>
 
 FormatBar::FormatBar(const QList<QAction *> &actions, QWidget *parent)
@@ -13,8 +13,9 @@ FormatBar::FormatBar(const QList<QAction *> &actions, QWidget *parent)
 {
     auto *layout = new QHBoxLayout(this);
     layout->setSpacing(0);
-    // Toolbar-sized icons are easier to hit.
-    const int size = style()->pixelMetric(QStyle::PM_ToolBarIconSize, nullptr, this);
+    // The grid the icons are drawn on, so their lines fall on whole pixels;
+    // bigger than a menu icon and easier to hit.
+    const int size = 24;
     for (QAction *action : actions) {
         auto *button = new QToolButton(this);
         button->setDefaultAction(action);
@@ -60,21 +61,52 @@ QSize FormatBar::fitMenu(QSize size) const
     return size;
 }
 
+namespace {
+
+// Draws the icon anew at each size asked for, so it is never scaled from
+// another size, which would blur its lines.
+class TintedIconEngine : public QIconEngine
+{
+public:
+    TintedIconEngine(const QString &file, const QPalette &palette)
+        : m_source(file)
+        , m_palette(palette)
+    {
+    }
+
+    void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state) override
+    {
+        const qreal scale = painter->device()->devicePixelRatioF();
+        painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, scale));
+    }
+
+    QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) override
+    {
+        return scaledPixmap(size, mode, state, 1.0);
+    }
+
+    QPixmap scaledPixmap(const QSize &size, QIcon::Mode mode, QIcon::State, qreal scale) override
+    {
+        // The icons are black shapes, painted over in the text color.
+        QPixmap pixmap = m_source.pixmap(size, scale);
+        QPainter painter(&pixmap);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(pixmap.rect(), m_palette.color(mode == QIcon::Disabled ? QPalette::Disabled
+                                                                                 : QPalette::Active,
+                                                        QPalette::WindowText));
+        return pixmap;
+    }
+
+    QIconEngine *clone() const override { return new TintedIconEngine(*this); }
+
+private:
+    QIcon m_source;
+    QPalette m_palette;
+};
+
+} // namespace
+
 QIcon formatIcon(const QString &file, const QPalette &palette)
 {
-    // The icons are black shapes, painted over in the text color.
-    const QIcon source(file);
-    QIcon icon;
-    for (const int size : {16, 22, 32, 44, 64}) {
-        for (const auto &[mode, group] : {std::pair(QIcon::Normal, QPalette::Active),
-                                          std::pair(QIcon::Disabled, QPalette::Disabled)}) {
-            QPixmap pixmap = source.pixmap(QSize(size, size), 1.0);
-            QPainter painter(&pixmap);
-            painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-            painter.fillRect(pixmap.rect(), palette.color(group, QPalette::WindowText));
-            painter.end();
-            icon.addPixmap(pixmap, mode);
-        }
-    }
-    return icon;
+    return QIcon(new TintedIconEngine(file, palette));
 }
