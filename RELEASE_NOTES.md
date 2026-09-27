@@ -16,5 +16,6 @@ for the Linux desktop. Expect rough edges.
 
 ## Installing
 
-Build from source — see [README](README.md#building). Requires Qt 6.5+
+Build from source — see
+[README](https://github.com/moloo4ni/textdichter#building). Requires Qt 6.5+
 (with Qt SVG) and cmark.
