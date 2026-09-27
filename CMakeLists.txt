@@ -17,7 +17,6 @@ qt_add_library(textdichter_core STATIC
     src/bars.h
     src/editing.cpp src/editing.h
     src/findbar.cpp src/findbar.h
-    src/formatbar.cpp src/formatbar.h
     src/formatting.cpp src/formatting.h
     src/highlighter.cpp src/highlighter.h
     src/lines.h
@@ -29,12 +28,6 @@ qt_add_library(textdichter_core STATIC
 target_include_directories(textdichter_core PUBLIC src)
 target_compile_definitions(textdichter_core PUBLIC TEXTDICHTER_VERSION="${PROJECT_VERSION}")
 target_link_libraries(textdichter_core PUBLIC Qt6::Widgets Qt6::PrintSupport PkgConfig::CMARK)
-# Lucide icons (ISC, see data/icons/format/LICENSE).
-qt_add_resources(textdichter_core format_icons PREFIX /icons BASE data/icons FILES
-    data/icons/format/bold.svg data/icons/format/italic.svg data/icons/format/code.svg
-    data/icons/format/link.svg data/icons/format/heading.svg data/icons/format/quote.svg
-    data/icons/format/list.svg data/icons/format/code-block.svg
-)
 
 qt_add_executable(textdichter src/main.cpp)
 target_link_libraries(textdichter PRIVATE textdichter_core)

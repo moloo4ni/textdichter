@@ -54,8 +54,6 @@ QAction *previewAction(QMainWindow &window)
     return nullptr;
 }
 
-// Runs a command on text where `|` marks the cursor and `⟨…⟩` the selection,
-// and returns the result marked the same way.
 // The text of a block styled with the format property, e.g. "**bold**" -> "bold".
 QString styled(const QTextBlock &block, const std::function<bool(const QTextCharFormat &)> &has)
 {
@@ -94,6 +92,8 @@ void clickBanner(MainWindow &window, const QString &button)
     QFAIL(qPrintable(u"No button "_s + button));
 }
 
+// Runs a command on text where `|` marks the cursor and `⟨…⟩` the selection,
+// and returns the result marked the same way.
 QString edited(QString text, const std::function<void(QTextCursor &)> &command)
 {
     const QChar open(0x27E8), close(0x27E9), bar(QLatin1Char('|'));
@@ -601,7 +601,6 @@ private slots:
         QCOMPARE(editor.text(), u"- a\n- [b](https://example.org)"_s);
     }
 
-    // Non-breaking spaces and U+2028 must survive a save.
     void editorContextMenu()
     {
         MainWindow window;
@@ -631,28 +630,37 @@ private slots:
             QVERIFY(opened);
         };
 
-        // Inside the selection: the selection stays, and Bold applies to it.
+        // The formats and editing, the same menu whatever is selected.
+        const auto texts = [](QMenu *menu) {
+            QStringList texts;
+            for (QAction *action : menu->actions())
+                texts << (action->isSeparator() ? u"-"_s : action->text());
+            return texts;
+        };
+        const QStringList items = {u"&Bold"_s, u"&Italic"_s, u"&Code"_s, u"&Link"_s, u"-"_s,
+                                   u"&Heading"_s, u"&Quote"_s, u"&List"_s, u"Code &Block"_s, u"-"_s,
+                                   u"&Undo"_s, u"&Redo"_s, u"-"_s, u"Cu&t"_s, u"&Copy"_s, u"&Paste"_s, u"-"_s,
+                                   u"Select &All"_s};
+
+        // Inside the selection of a word: the selection stays.
         rightClick(2, [&](QMenu *menu) {
-            const QList<QToolButton *> buttons = menu->findChildren<QToolButton *>();
-            QCOMPARE(buttons.size(), 8);
-            QCOMPARE(buttons[0]->toolTip(), QStringLiteral("Bold (%1)").arg(
-                QKeySequence(QKeySequence::Bold).toString(QKeySequence::NativeText)));
-            // The headings and the lists open their menus.
-            QVERIFY(buttons[4]->defaultAction()->menu());
-            QCOMPARE(buttons[6]->defaultAction()->menu()->actions().size(), 2);
             QCOMPARE(editor->textCursor().selectedText(), u"word"_s);
-            buttons[0]->click();
-            QVERIFY(!menu->isVisible());
+            QCOMPARE(texts(menu), items);
+            menu->actions()[0]->trigger();
         });
         QCOMPARE(editor->toPlainText(), u"**word** and more words"_s);
 
         // Outside it: the cursor moves to the click.
-        rightClick(15, [&](QMenu *) {
+        rightClick(15, [&](QMenu *menu) {
             QVERIFY(!editor->textCursor().hasSelection());
             QCOMPARE(editor->textCursor().position(), 15);
+            QCOMPARE(texts(menu), items);
+            QCOMPARE(menu->actions()[5]->menu()->actions().size(), 8); // six levels, a line, normal text
+            QCOMPARE(texts(menu->actions()[7]->menu()), (QStringList{u"B&ulleted List"_s, u"&Numbered List"_s}));
         });
     }
 
+    // Non-breaking spaces and U+2028 must survive a save.
     void saveKeepsText()
     {
         QTemporaryDir dir;

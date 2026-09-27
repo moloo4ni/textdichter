@@ -4,7 +4,6 @@
 #include "banner.h"
 #include "bars.h"
 #include "findbar.h"
-#include "formatbar.h"
 #include "formatting.h"
 #include "markdown.h"
 #include "views.h"
@@ -37,7 +36,6 @@
 #include <QTextDocument>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <QWidgetAction>
 #include <QtMath>
 
 #include <cmark.h>
@@ -249,18 +247,8 @@ void MainWindow::createMenus()
             command(cursor);
             m_editor->setTextCursor(cursor);
         });
-        // For the buttons of the context menu, which have no text of their own.
-        if (!key.isEmpty())
-            action->setToolTip(QStringLiteral("%1 (%2)").arg(action->iconText(),
-                                                             key.toString(QKeySequence::NativeText)));
         m_formatActions.append(action);
         return action;
-    };
-    // Lucide icons, one set whatever the theme. They show in the context menu
-    // only; the menu bar stays text.
-    const auto setIcon = [this](QAction *action, const QString &name) {
-        action->setIconVisibleInMenu(false);
-        m_formatIcons.append({action, QStringLiteral(":/icons/format/%1.svg").arg(name)});
     };
     const auto wrap = [](const QString &marker) {
         return [marker](QTextCursor &cursor) { formatting::toggleInline(cursor, marker); };
@@ -287,18 +275,14 @@ void MainWindow::createMenus()
     QAction *numbers = addFormat(format, tr("&Numbered List"), {}, prefix(formatting::LinePrefix::Numbered));
     QAction *codeBlock = addFormat(format, tr("Code &Block"), {}, formatting::wrapCodeBlock);
 
-    // Both lists behind one button of the context menu, like the headings.
+    // Every format a click away in the context menu; the two lists behind one
+    // item there, like the headings.
     auto *lists = new QMenu(tr("&List"), this);
     lists->addActions({bullets, numbers});
-    setIcon(bold, QStringLiteral("bold"));
-    setIcon(italic, QStringLiteral("italic"));
-    setIcon(code, QStringLiteral("code"));
-    setIcon(link, QStringLiteral("link"));
-    setIcon(heading->menuAction(), QStringLiteral("heading"));
-    setIcon(quote, QStringLiteral("quote"));
-    setIcon(lists->menuAction(), QStringLiteral("list"));
-    setIcon(codeBlock, QStringLiteral("code-block"));
-    m_formatButtons = {bold, italic, code, link, heading->menuAction(), quote, lists->menuAction(), codeBlock};
+    auto *separator = new QAction(this);
+    separator->setSeparator(true);
+    m_contextFormats = {bold, italic, code, link, separator, heading->menuAction(), quote, lists->menuAction(),
+                        codeBlock};
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     m_previewAction = view->addAction(tr("&Preview"));
@@ -340,16 +324,8 @@ void MainWindow::showEditorMenu(const QPoint &pos)
         || clicked.position() > cursor.selectionEnd())
         m_editor->setTextCursor(clicked);
 
-    // Drawn anew each time, in the colors of the current theme.
-    for (const auto &[action, file] : std::as_const(m_formatIcons))
-        action->setIcon(formatIcon(file, palette()));
-
     QMenu menu(this);
-    auto *bar = new FormatBar(m_formatButtons, &menu);
-    connect(bar, &FormatBar::triggered, &menu, &QMenu::close);
-    auto *buttons = new QWidgetAction(&menu);
-    buttons->setDefaultWidget(bar);
-    menu.addAction(buttons);
+    menu.addActions(m_contextFormats);
     menu.addSeparator();
     menu.addActions({m_undoAction, m_redoAction});
     menu.addSeparator();

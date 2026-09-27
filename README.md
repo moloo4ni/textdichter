@@ -33,8 +33,8 @@ keyboard layout.
   lists and code blocks. Applying a format again removes it. Without a
   selection it inserts a pair of markers to type into, and pressed again at
   their end steps out of them.
-- **Right-click menu** — the same formats as icon buttons above the usual
-  editing commands, for working with the mouse.
+- **Right-click menu** — every format a click away, above the usual editing
+  commands, for working with the mouse.
 - **Lists and quotes continue** on Enter; an empty item ends the list. Tab and
   Shift+Tab nest and unnest list items the way CommonMark expects.
 - **Pasting a URL over a selection** turns it into a link.
@@ -64,5 +64,4 @@ Pre-release. Everything described above works, but expect rough edges.
 
 ## License
 
-[MPL-2.0](LICENSE). The format icons are from [Lucide](https://lucide.dev)
-([ISC](data/icons/format/LICENSE)).
+[MPL-2.0](LICENSE).
