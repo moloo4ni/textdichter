@@ -145,11 +145,12 @@ void Preview::styleDocument(QTextDocument *document, const QFont &font, const QC
     document->setDefaultFont(font);
     document->setIndentWidth(3 * advance);
     // QTextBrowser supports neither border-left nor padding here, so quotes are
-    // told apart by a dimmed color and code blocks by a background. A rule is
-    // as dim as markers in Code, not a bright line across the page.
+    // told apart by a dimmed color and code, inline or in blocks, by
+    // a background. A rule is as dim as markers in Code, not a bright line
+    // across the page.
     document->setDefaultStyleSheet(
         QStringLiteral("code, pre { font-family: '%1'; }"
-                       "pre { background-color: %2; }"
+                       "code, pre { background-color: %2; }"
                        "blockquote { color: %3; margin-left: %4px; margin-right: 0px; }"
                        "hr { background-color: %5; }")
             .arg(fixed.family(), mix(base, text, 0.08).name(), mix(base, text, 0.65).name(),
