@@ -9,10 +9,12 @@
 
 int main(int argc, char *argv[])
 {
+    // Before the app exists, so Qt registers it with the desktop portal before
+    // anything else asks the portal; later the portal refuses the name.
+    QGuiApplication::setDesktopFileName(QStringLiteral("textdichter"));
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("textdichter"));
     app.setApplicationVersion(QStringLiteral(TEXTDICHTER_VERSION));
-    app.setDesktopFileName(QStringLiteral("textdichter"));
     app.setWindowIcon(QIcon(QStringLiteral(":/icons/textdichter.svg")));
 
     // Qt's own strings (standard buttons, file dialogs) and ours.
