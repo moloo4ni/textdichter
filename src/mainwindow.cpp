@@ -168,11 +168,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_preview->viewport()->installEventFilter(this);
     qApp->installEventFilter(this); // Ctrl+/ on non-US layouts, see eventFilter()
 
-    QSettings settings = ::settings();
-    if (!restoreGeometry(settings.value(QStringLiteral("geometry")).toByteArray()))
-        // As wide as the text column, so a floating window has no empty
-        // sides; three quarters of the screen high.
-        resize(m_editor->sizeHint().width(), screen()->availableGeometry().height() * 3 / 4);
+    // As wide as the text column, so a floating window has no empty sides;
+    // three quarters of the screen high. The size is not remembered: a tiling
+    // window manager would leave the size of a tile, and the window would come
+    // up that big when made floating.
+    resize(m_editor->sizeHint().width(), screen()->availableGeometry().height() * 3 / 4);
 
     setDocument({}, {});
     updateActions();
@@ -859,7 +859,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
         event->ignore();
         return;
     }
-    settings().setValue(QStringLiteral("geometry"), saveGeometry());
     event->accept();
 }
 
