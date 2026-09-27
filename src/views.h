@@ -21,7 +21,7 @@ inline QColor mix(const QColor &from, const QColor &to, qreal t)
 }
 
 // Width of the text column, in characters of the monospace font.
-constexpr int kColumnChars = 72;
+constexpr int kColumnChars = 80;
 
 // A text view that keeps its text in a centered column of kColumnChars
 // characters and zooms relative to a base font.

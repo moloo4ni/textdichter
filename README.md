@@ -18,7 +18,7 @@ CommonMark only — out of the box.
 
 ## Interface
 
-A classic menu bar and a single centered column of text, 72 characters wide.
+A classic menu bar and a single centered column of text, 80 characters wide.
 Two modes, switched with `Ctrl+/` or *View → Preview*:
 
 - **Code** — the Markdown source in a monospace font.
