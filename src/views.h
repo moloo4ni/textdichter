@@ -5,6 +5,7 @@
 #include <QFontMetrics>
 #include <QPlainTextEdit>
 #include <QTextBrowser>
+#include <QtMath>
 
 #include <algorithm>
 
@@ -75,7 +76,10 @@ private:
     {
         QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
         fixed.setPointSizeF(this->font().pointSizeF());
-        const int column = QFontMetrics(fixed).horizontalAdvance(QLatin1Char('m')) * kColumnChars;
+        // The document keeps a margin inside the viewport, so the column is
+        // wider than its characters by that margin on both sides.
+        const qreal chars = QFontMetricsF(fixed).horizontalAdvance(QLatin1Char('m')) * kColumnChars;
+        const int column = qCeil(chars + 2 * this->document()->documentMargin());
         const int side = std::max(0, (this->width() - column) / 2);
         this->setViewportMargins(side, 0, side, 0);
     }
