@@ -12,9 +12,10 @@ FormatBar::FormatBar(const QList<QAction *> &actions, QWidget *parent)
     : QWidget(parent)
 {
     auto *layout = new QHBoxLayout(this);
-    // Beside the buttons' own padding, no side margins: the icons line up with
-    // the text of the menu items.
-    layout->setContentsMargins(0, 3, 0, 3);
+    // No margins beside the buttons' own padding: the icons line up with the
+    // text of the menu items, and a highlighted button is as far from the top
+    // of the menu as from its side.
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     // The grid the icons are drawn on, so their lines fall on whole pixels;
     // bigger than a menu icon and easier to hit.
