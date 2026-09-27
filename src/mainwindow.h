@@ -47,7 +47,7 @@ private:
 
     void createMenus();
     void createStatusBar();
-    // The editor's context menu: format buttons on top, then editing.
+    // The editor's context menu: a row of format buttons, then editing.
     void showEditorMenu(const QPoint &pos);
 
     // Everything that replaces the document asks confirmDiscard() first.
@@ -114,7 +114,7 @@ private:
     QAction *m_statusBarAction = nullptr;
     QList<QAction *> m_formatActions; // enabled in the code only
     QList<std::pair<QAction *, QString>> m_formatIcons; // the actions' icon files
-    QList<QList<QAction *>> m_formatRows; // buttons of the context menu
+    QList<QAction *> m_formatButtons; // of the context menu
 
     QString m_path; // empty for an untitled document
     TextFile m_file; // line endings and BOM of the open file; text is in the editor

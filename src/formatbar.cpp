@@ -1,39 +1,63 @@
 #include "formatbar.h"
 
 #include <QAction>
-#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
 #include <QStyle>
 #include <QToolButton>
 
-FormatBar::FormatBar(const QList<QList<QAction *>> &rows, QWidget *parent)
+FormatBar::FormatBar(const QList<QAction *> &actions, QWidget *parent)
     : QWidget(parent)
 {
-    auto *grid = new QGridLayout(this);
-    grid->setSpacing(0);
+    auto *layout = new QHBoxLayout(this);
+    layout->setSpacing(0);
     // Toolbar-sized icons are easier to hit.
     const int size = style()->pixelMetric(QStyle::PM_ToolBarIconSize, nullptr, this);
-    int columns = 0;
-    for (int row = 0; row < rows.size(); ++row) {
-        for (int column = 0; column < rows[row].size(); ++column) {
-            QAction *action = rows[row][column];
-            auto *button = new QToolButton(this);
-            button->setDefaultAction(action);
-            button->setAutoRaise(true);
-            button->setIconSize(QSize(size, size));
-            if (action->menu())
-                button->setPopupMode(QToolButton::InstantPopup);
-            connect(button, &QToolButton::triggered, this, [this](QAction *chosen) {
-                if (!chosen->menu())
-                    emit triggered();
-            });
-            grid->addWidget(button, row, column);
-        }
-        columns = std::max(columns, int(rows[row].size()));
+    for (QAction *action : actions) {
+        auto *button = new QToolButton(this);
+        button->setDefaultAction(action);
+        button->setAutoRaise(true);
+        button->setIconSize(QSize(size, size));
+        if (action->menu())
+            button->setPopupMode(QToolButton::InstantPopup);
+        connect(button, &QToolButton::triggered, this, [this](QAction *chosen) {
+            if (!chosen->menu())
+                emit triggered();
+        });
+        // Spread over the width of a menu wider than the row.
+        layout->addWidget(button, 1, Qt::AlignCenter);
     }
-    grid->setColumnStretch(columns, 1);
+}
+
+QSize FormatBar::sizeHint() const
+{
+    return fitMenu(QWidget::sizeHint());
+}
+
+QSize FormatBar::minimumSizeHint() const
+{
+    return fitMenu(QWidget::minimumSizeHint());
+}
+
+QSize FormatBar::fitMenu(QSize size) const
+{
+    // QMenu widens a widget by its column of shortcuts, as if the widget had
+    // one too, which leaves empty space next to the row. Taken back here, the
+    // menu is as wide as the row or its items, whichever is wider.
+    const auto *menu = qobject_cast<const QMenu *>(parentWidget());
+    if (!menu)
+        return size;
+    const QFontMetrics metrics(menu->font());
+    int shortcuts = 0;
+    for (const QAction *action : menu->actions()) {
+        if (action->isVisible() && !action->shortcut().isEmpty())
+            shortcuts = std::max(shortcuts, metrics.horizontalAdvance(
+                                                action->shortcut().toString(QKeySequence::NativeText)));
+    }
+    size.setWidth(std::max(0, size.width() - shortcuts));
+    return size;
 }
 
 QIcon formatIcon(const QString &file, const QPalette &palette)

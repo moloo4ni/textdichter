@@ -298,7 +298,7 @@ void MainWindow::createMenus()
     setIcon(quote, QStringLiteral("quote"));
     setIcon(lists->menuAction(), QStringLiteral("list"));
     setIcon(codeBlock, QStringLiteral("code-block"));
-    m_formatRows = {{bold, italic, code, link}, {heading->menuAction(), quote, lists->menuAction(), codeBlock}};
+    m_formatButtons = {bold, italic, code, link, heading->menuAction(), quote, lists->menuAction(), codeBlock};
 
     QMenu *view = menuBar()->addMenu(tr("&View"));
     m_previewAction = view->addAction(tr("&Preview"));
@@ -345,11 +345,11 @@ void MainWindow::showEditorMenu(const QPoint &pos)
         action->setIcon(formatIcon(file, palette()));
 
     QMenu menu(this);
-    auto *bar = new FormatBar(m_formatRows, &menu);
+    auto *bar = new FormatBar(m_formatButtons, &menu);
     connect(bar, &FormatBar::triggered, &menu, &QMenu::close);
-    auto *rows = new QWidgetAction(&menu);
-    rows->setDefaultWidget(bar);
-    menu.addAction(rows);
+    auto *buttons = new QWidgetAction(&menu);
+    buttons->setDefaultWidget(bar);
+    menu.addAction(buttons);
     menu.addSeparator();
     menu.addActions({m_undoAction, m_redoAction});
     menu.addSeparator();
