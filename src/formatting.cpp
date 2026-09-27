@@ -81,6 +81,10 @@ void toggleInline(QTextCursor &cursor, const QString &marker)
         remove(start - m);
         start -= m;
         end -= m;
+    } else if (start == end && start > 0 && !doc->characterAt(start - 1).isSpace() && doc->characterAt(start - 1) != c
+               && isMarker(runFrom(end, 1, doc->characterCount()))) {
+        // Right before a closing marker: step over it and go on typing plain text.
+        start = end += m;
     } else {
         edit.setPosition(end);
         edit.insertText(marker);

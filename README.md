@@ -30,7 +30,9 @@ keyboard layout.
 ## Editing
 
 - **Format menu** — bold, italic, code, links, headings (`Ctrl+1…6`), quotes,
-  lists and code blocks. Applying a format again removes it.
+  lists and code blocks. Applying a format again removes it. Without a
+  selection it inserts a pair of markers to type into, and pressed again at
+  their end steps out of them.
 - **Right-click menu** — the same formats as icon buttons above the usual
   editing commands, for working with the mouse.
 - **Lists and quotes continue** on Enter; an empty item ends the list. Tab and

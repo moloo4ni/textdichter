@@ -326,6 +326,12 @@ private slots:
         QTest::newRow("italic inside bold") << u"*"_s << u"**⟨word⟩**"_s << u"***⟨word⟩***"_s;
         QTest::newRow("italic off bold") << u"*"_s << u"***⟨word⟩***"_s << u"**⟨word⟩**"_s;
         QTest::newRow("bold off bold italic") << u"**"_s << u"***⟨word⟩***"_s << u"*⟨word⟩*"_s;
+        QTest::newRow("step out of bold") << u"**"_s << u"**word|**"_s << u"**word**|"_s;
+        QTest::newRow("step out of italic") << u"*"_s << u"a *word|* b"_s << u"a *word*| b"_s;
+        QTest::newRow("step out of code") << u"`"_s << u"`word|`"_s << u"`word`|"_s;
+        QTest::newRow("italic out of bold italic") << u"*"_s << u"***word|***"_s << u"***word*|**"_s;
+        QTest::newRow("bold out of bold italic") << u"**"_s << u"***word|***"_s << u"***word**|*"_s;
+        QTest::newRow("no step over an opening marker") << u"**"_s << u"a |**b**"_s << u"a **|****b**"_s;
     }
 
     void formatInline()

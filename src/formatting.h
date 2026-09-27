@@ -9,7 +9,8 @@ class QTextCursor;
 namespace formatting {
 
 // Wraps the selection in the marker (`**`, `*` or `` ` ``), or unwraps it if it
-// is already wrapped. Without a selection inserts a pair of markers.
+// is already wrapped. Without a selection inserts a pair of markers, or steps over
+// the closing marker right after the cursor, to go on with plain text.
 void toggleInline(QTextCursor &cursor, const QString &marker);
 
 // `[selection](|)`, or `[|](url)` if the selection is a URL.
