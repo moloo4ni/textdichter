@@ -137,10 +137,7 @@ void Preview::styleDocument(QTextDocument *document, const QFont &font, const QC
 {
     // Lists and quotes are indented by the character grid of Code: a quote by
     // two characters, like "> ", a list by three, like "1. ", since two would
-    // cut off numbers from 10 on. Headings stay close to the text size: Code
-    // has one size for everything, and big headings would make the modes look
-    // unrelated. The sizes are keywords, because headings carry a relative
-    // size step, which wins over a size in points.
+    // cut off numbers from 10 on.
     QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     fixed.setPointSizeF(font.pointSizeF());
     const qreal advance = QFontMetricsF(fixed).horizontalAdvance(QLatin1Char('m'));
@@ -151,10 +148,7 @@ void Preview::styleDocument(QTextDocument *document, const QFont &font, const QC
     // told apart by a dimmed color and code blocks by a background. A rule is
     // as dim as markers in Code, not a bright line across the page.
     document->setDefaultStyleSheet(
-        QStringLiteral("h1 { font-size: x-large; }"
-                       "h2 { font-size: large; }"
-                       "h3, h4, h5, h6 { font-size: medium; }"
-                       "code, pre { font-family: '%1'; }"
+        QStringLiteral("code, pre { font-family: '%1'; }"
                        "pre { background-color: %2; }"
                        "blockquote { color: %3; margin-left: %4px; margin-right: 0px; }"
                        "hr { background-color: %5; }")
