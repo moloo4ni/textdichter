@@ -62,9 +62,11 @@ QString styled(const QTextBlock &block, const std::function<bool(const QTextChar
     return result;
 }
 
-bool isBold(const QTextCharFormat &format)
+// Characters dimmed as markup in the editor's palette.
+QString dimmed(const Editor &editor, const QTextBlock &block)
 {
-    return format.fontWeight() == QFont::Bold;
+    const QColor dim = mix(editor.palette().color(QPalette::Base), editor.palette().color(QPalette::Text), 0.45);
+    return styled(block, [&](const QTextCharFormat &f) { return f.foreground().color() == dim; });
 }
 
 void writeFile(const QString &path, const QByteArray &bytes)
@@ -642,20 +644,21 @@ private slots:
     void highlighterStyles()
     {
         Editor editor;
-        editor.setPlainText(u"## Title ##\nSome **bold**, *it*, `**code**` and [link](url).\n> quote"_s);
+        editor.setPlainText(u"## Title ##\nSome **bold**, *it*, `**code**`, [link](url) and <ab:c>.\n> quote"_s);
         QTextBlock block = editor.document()->firstBlock();
-        QCOMPARE(styled(block, isBold), u"## Title ##"_s);
-        const QColor dim = mix(editor.palette().color(QPalette::Base), editor.palette().color(QPalette::Text), 0.45);
-        const auto isDim = [&](const QTextCharFormat &f) { return f.foreground().color() == dim; };
-        QCOMPARE(styled(block, isDim), u"## ##"_s);
-
+        QCOMPARE(dimmed(editor, block), u"## ##"_s);
         block = block.next();
-        QCOMPARE(styled(block, isBold), u"bold"_s);
-        QCOMPARE(styled(block, [](const QTextCharFormat &f) { return f.fontItalic(); }), u"it"_s);
-        QCOMPARE(styled(block, [](const QTextCharFormat &f) { return f.hasProperty(QTextFormat::BackgroundBrush); }),
-                 u"**code**"_s);
-        QCOMPARE(styled(block, isDim), u"******``[](url)"_s);
-        QCOMPARE(styled(block.next(), isDim), u"> "_s);
+        QCOMPARE(dimmed(editor, block), u"******``[](url)<>"_s);
+        QCOMPARE(dimmed(editor, block.next()), u"> "_s);
+
+        // Only markup is styled: the text keeps the plain look of the source.
+        for (QTextBlock b = editor.document()->firstBlock(); b.isValid(); b = b.next()) {
+            QCOMPARE(styled(b, [](const QTextCharFormat &f) {
+                         return f.fontWeight() > QFont::Normal || f.fontItalic()
+                             || f.hasProperty(QTextFormat::BackgroundBrush);
+                     }),
+                     QString());
+        }
     }
 
     // Opening a fence restyles every line below; closing it restores them.
@@ -664,20 +667,20 @@ private slots:
         Editor editor;
         editor.setPlainText(u"one\n# two\n# three"_s);
         QTextDocument *doc = editor.document();
-        QCOMPARE(styled(doc->lastBlock(), isBold), u"# three"_s);
+        QCOMPARE(dimmed(editor, doc->lastBlock()), u"#"_s);
 
         QTextCursor cursor(doc);
         cursor.insertText(u"```\n"_s);
-        QCOMPARE(styled(doc->findBlockByNumber(2), isBold), QString());
-        QCOMPARE(styled(doc->lastBlock(), isBold), QString());
+        QCOMPARE(dimmed(editor, doc->findBlockByNumber(2)), QString());
+        QCOMPARE(dimmed(editor, doc->lastBlock()), QString());
 
         editor.undo();
-        QCOMPARE(styled(doc->lastBlock(), isBold), u"# three"_s);
+        QCOMPARE(dimmed(editor, doc->lastBlock()), u"#"_s);
 
-        // A setext underline makes the line above a heading.
+        // A line of === under text is a setext underline, not text.
         cursor.setPosition(3);
         cursor.insertText(u"\n==="_s);
-        QCOMPARE(styled(doc->firstBlock(), isBold), u"one"_s);
+        QCOMPARE(dimmed(editor, doc->findBlockByNumber(1)), u"==="_s);
     }
 
     void backupLifecycle()

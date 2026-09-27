@@ -4,9 +4,10 @@
 #include <QSyntaxHighlighter>
 #include <QTextCharFormat>
 
-// Styles the Markdown source: headings, emphasis, code and links, with the
-// markup itself dimmed. The block structure comes from cmark, so a `#` inside
-// a code block is not a heading; inline markup is matched line by line.
+// Dims the markup in the Markdown source and leaves the text itself alone:
+// Code shows the source as it is, Preview shows how it renders. The block
+// structure comes from cmark, so a `#` inside a code block is not a heading;
+// inline markup is matched line by line.
 class Highlighter : public QSyntaxHighlighter
 {
 public:
@@ -36,9 +37,4 @@ private:
 
     QList<Line> m_lines;
     QTextCharFormat m_markup;
-    QTextCharFormat m_heading;
-    QTextCharFormat m_bold;
-    QTextCharFormat m_italic;
-    QTextCharFormat m_code;
-    QTextCharFormat m_linkText;
 };

@@ -49,17 +49,6 @@ void Highlighter::setPalette(const QPalette &palette)
     const QColor text = palette.color(QPalette::Text);
     m_markup = {};
     m_markup.setForeground(mix(base, text, 0.45));
-    m_heading = {};
-    m_heading.setFontWeight(QFont::Bold);
-    m_heading.setForeground(palette.color(QPalette::Link));
-    m_bold = {};
-    m_bold.setFontWeight(QFont::Bold);
-    m_italic = {};
-    m_italic.setFontItalic(true);
-    m_code = {};
-    m_code.setBackground(mix(base, text, 0.08));
-    m_linkText = {};
-    m_linkText.setForeground(palette.color(QPalette::Link));
     rehighlight();
 }
 
@@ -197,7 +186,6 @@ void Highlighter::highlightBlock(const QString &text)
     }
 
     if (line.kind == Kind::Heading) {
-        merge(pos, text.size() - pos, m_heading);
         static const QRegularExpression opening(QStringLiteral(R"( {0,3}#{1,6}(?=\s|$))"));
         static const QRegularExpression closing(QStringLiteral(R"([ \t]#+[ \t]*$)"));
         const auto open = matchAt(opening, text, pos);
@@ -230,7 +218,6 @@ void Highlighter::highlightInlines(const QString &text, int from)
     static const QRegularExpression codeSpan(QStringLiteral(R"((?<!`)(`+)(?!`)(.+?)(?<!`)\1(?!`))"));
     each(codeSpan, text, [&](const QRegularExpressionMatch &m) {
         merge(m.capturedStart(), m.capturedLength(1), m_markup);
-        merge(m.capturedStart(2), m.capturedLength(2), m_code);
         merge(m.capturedEnd(2), m.capturedLength(1), m_markup);
         take(m.capturedStart(), m.capturedLength());
     });
@@ -240,8 +227,8 @@ void Highlighter::highlightInlines(const QString &text, int from)
     each(autolink, text, [&](const QRegularExpressionMatch &m) {
         if (!isFree(m.capturedStart(), m.capturedLength()))
             return;
-        merge(m.capturedStart(), m.capturedLength(), m_markup);
-        merge(m.capturedStart() + 1, m.capturedLength() - 2, m_linkText);
+        merge(m.capturedStart(), 1, m_markup);
+        merge(m.capturedEnd() - 1, 1, m_markup);
         take(m.capturedStart(), m.capturedLength());
     });
 
@@ -250,7 +237,6 @@ void Highlighter::highlightInlines(const QString &text, int from)
         if (!isFree(m.capturedStart(), m.capturedLength(1)) || !isFree(m.capturedStart(3), m.capturedLength(3)))
             return;
         merge(m.capturedStart(1), m.capturedLength(1), m_markup);
-        merge(m.capturedStart(2), m.capturedLength(2), m_linkText);
         merge(m.capturedStart(3), m.capturedLength(3), m_markup);
         take(m.capturedStart(1), m.capturedLength(1));
         take(m.capturedStart(3), m.capturedLength(3));
@@ -259,13 +245,12 @@ void Highlighter::highlightInlines(const QString &text, int from)
     // Emphasis markers must be free; bold ones are hidden from the italic
     // pattern, so `***both***` is bold around italic.
     QString rest = text;
-    const auto emphasis = [&](const QRegularExpression &re, int markerLength, const QTextCharFormat &format) {
+    const auto emphasis = [&](const QRegularExpression &re, int markerLength) {
         each(re, rest, [&](const QRegularExpressionMatch &m) {
             const int open = m.capturedStart();
             const int close = m.capturedEnd() - markerLength;
             if (!isFree(open, markerLength) || !isFree(close, markerLength))
                 return;
-            merge(open + markerLength, close - open - markerLength, format);
             merge(open, markerLength, m_markup);
             merge(close, markerLength, m_markup);
             rest.replace(open, markerLength, QString(markerLength, QChar::Null));
@@ -278,10 +263,10 @@ void Highlighter::highlightInlines(const QString &text, int from)
     static const QRegularExpression italicStar(QStringLiteral(R"((?<![\\*])\*(?![\s*])(.+?)(?<![\s\\*])\*(?!\*))"));
     static const QRegularExpression italicUnderscore(
         QStringLiteral(R"((?<![\\\w])_(?![\s_])(.+?)(?<![\s\\_])_(?!\w))"));
-    emphasis(boldStars, 2, m_bold);
-    emphasis(boldUnderscores, 2, m_bold);
-    emphasis(italicStar, 1, m_italic);
-    emphasis(italicUnderscore, 1, m_italic);
+    emphasis(boldStars, 2);
+    emphasis(boldUnderscores, 2);
+    emphasis(italicStar, 1);
+    emphasis(italicUnderscore, 1);
 }
 
 void Highlighter::merge(int start, int length, const QTextCharFormat &format)

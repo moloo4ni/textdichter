@@ -35,8 +35,8 @@ keyboard layout.
   Shift+Tab nest and unnest list items the way CommonMark expects.
 - **Pasting a URL over a selection** turns it into a link.
 - **Find and replace** in a bar at the bottom of the window (`Ctrl+F`, `Ctrl+H`).
-- **Source styling** — headings, emphasis, code and links stand out, the markup
-  itself is dimmed. Font size stays the same everywhere.
+- **Dimmed markup** — in Code, `#`, `**`, `` ` `` and the rest of the markup are
+  dimmed, while the text stays plain: no bold, no colors, one font size.
 
 ## Building
 
