@@ -108,7 +108,11 @@ void Preview::render(const QString &source, const QUrl &baseUrl)
 void Preview::scrollToLine(int line)
 {
     auto it = std::upper_bound(m_anchorLines.cbegin(), m_anchorLines.cend(), line);
-    if (it != m_anchorLines.cbegin())
+    // The first block is shown with the document margin above it, as in Code;
+    // scrollToAnchor() would scroll the margin away.
+    if (it == m_anchorLines.cbegin() || std::prev(it) == m_anchorLines.cbegin())
+        verticalScrollBar()->setValue(0);
+    else
         scrollToAnchor(QStringLiteral("L%1").arg(*std::prev(it)));
 }
 
@@ -117,7 +121,9 @@ int Preview::topLine() const
     // A block of which only the bottom edge is still visible does not count.
     const int top = verticalScrollBar()->value();
     QAbstractTextDocumentLayout *layout = document()->documentLayout();
-    QTextBlock first = cursorForPosition(QPoint(0, 0)).block();
+    // Probed inside the document margin: a point in the margin hits nothing.
+    const int margin = qCeil(document()->documentMargin());
+    QTextBlock first = cursorForPosition(QPoint(margin, std::max(0, margin - top))).block();
     while (first.isValid() && layout->blockBoundingRect(first).bottom() <= top + 2)
         first = first.next();
 

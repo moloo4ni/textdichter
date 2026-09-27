@@ -9,6 +9,7 @@
 #include <QtMath>
 
 #include <algorithm>
+#include <cmath>
 
 class Highlighter;
 
@@ -80,9 +81,15 @@ private:
     {
         QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
         fixed.setPointSizeF(this->font().pointSizeF());
-        // The document keeps a margin inside the viewport, so the column is
-        // wider than its characters by that margin on both sides.
-        const qreal chars = QFontMetricsF(fixed).horizontalAdvance(QLatin1Char('m')) * kColumnChars;
+        const QFontMetricsF metrics(fixed);
+        // A line of air above the text and below it, in both modes alike. It
+        // is the document's own margin, so it scrolls away with the text.
+        const qreal margin = std::round(metrics.lineSpacing());
+        if (this->document()->documentMargin() != margin)
+            this->document()->setDocumentMargin(margin);
+        // The margin is on the sides too, so the column is wider than its
+        // characters by the margin on both sides.
+        const qreal chars = metrics.horizontalAdvance(QLatin1Char('m')) * kColumnChars;
         const int column = qCeil(chars + 2 * this->document()->documentMargin());
         // The column is centered in the window, and a scroll bar takes its
         // width from the right margin rather than from the column.
