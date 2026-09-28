@@ -144,8 +144,7 @@ void Preview::styleDocument(QTextDocument *document, const QFont &font, const QC
     // Lists and quotes are indented by the character grid of Code: a quote by
     // two characters, like "> ", a list by three, like "1. ", since two would
     // cut off numbers from 10 on.
-    QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    fixed.setPointSizeF(font.pointSizeF());
+    const QFont fixed = gridFont(font.pointSizeF());
     const qreal advance = QFontMetricsF(fixed).horizontalAdvance(QLatin1Char('m'));
 
     document->setDefaultFont(font);
@@ -167,9 +166,10 @@ void Preview::changeEvent(QEvent *event)
 {
     Centered<QTextBrowser>::changeEvent(event);
     if (event->type() == QEvent::PaletteChange || event->type() == QEvent::FontChange) {
-        // The style sheet only applies on setHtml(), so render again.
+        // The style sheet only applies on setHtml(), so render again. A hidden
+        // preview is rendered anew when it is shown.
         applyStyle();
-        if (!m_source.isNull()) {
+        if (isVisible() && !m_source.isNull()) {
             const int line = topLine();
             render(m_source, m_baseUrl);
             scrollToLine(line);

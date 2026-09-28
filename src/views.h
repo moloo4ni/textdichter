@@ -24,6 +24,14 @@ inline QColor mix(const QColor &from, const QColor &to, qreal t)
 // Width of the text column, in characters of the monospace font.
 constexpr int kColumnChars = 80;
 
+// The monospace font at a text size: it sets the character grid in both modes.
+inline QFont gridFont(qreal pointSize)
+{
+    QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    fixed.setPointSizeF(pointSize);
+    return fixed;
+}
+
 // A text view that keeps its text in a centered column of kColumnChars
 // characters and zooms relative to a base font.
 template <typename Base>
@@ -58,7 +66,7 @@ public:
     // Just wide enough for the column and a scroll bar.
     QSize sizeHint() const override
     {
-        return {columnWidth() + this->verticalScrollBar()->sizeHint().width(), Base::sizeHint().height()};
+        return {columnWidth(gridMetrics()) + this->verticalScrollBar()->sizeHint().width(), Base::sizeHint().height()};
     }
 
 protected:
@@ -83,38 +91,35 @@ private:
         this->setFont(font);
     }
 
-    // The monospace font at the current zoom: it sets the grid in both modes.
-    QFontMetricsF gridMetrics() const
-    {
-        QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-        fixed.setPointSizeF(this->font().pointSizeF());
-        return QFontMetricsF(fixed);
-    }
+    QFontMetricsF gridMetrics() const { return QFontMetricsF(gridFont(this->font().pointSizeF())); }
 
     // A line of air around the text, in both modes alike. It is the
     // document's own margin, so it scrolls away with the text.
-    qreal textMargin() const { return std::round(gridMetrics().lineSpacing()); }
+    static qreal textMargin(const QFontMetricsF &grid) { return std::round(grid.lineSpacing()); }
 
     // The column is wider than its characters by the margin on both sides.
-    int columnWidth() const
+    static int columnWidth(const QFontMetricsF &grid)
     {
-        return qCeil(gridMetrics().horizontalAdvance(QLatin1Char('m')) * kColumnChars + 2 * textMargin());
+        return qCeil(grid.horizontalAdvance(QLatin1Char('m')) * kColumnChars + 2 * textMargin(grid));
     }
 
     void updateColumn()
     {
-        const qreal margin = textMargin();
+        const QFontMetricsF grid = gridMetrics();
+        const qreal margin = textMargin(grid);
         if (this->document()->documentMargin() != margin)
             this->document()->setDocumentMargin(margin);
         // The column is centered in the window, and a scroll bar takes its
         // width from the right margin rather than from the column. With no
         // room for both, the column moves left.
-        const int column = columnWidth();
+        const int column = columnWidth(grid);
         const QScrollBar *bar = this->verticalScrollBar();
         const int barWidth = bar->maximum() > bar->minimum() ? bar->sizeHint().width() : 0;
         const int left = std::clamp((this->width() - column) / 2, 0, std::max(0, this->width() - barWidth - column));
         const int right = std::max(0, this->width() - barWidth - column - left);
-        this->setViewportMargins(left, 0, right, 0);
+        const QMargins margins(left, 0, right, 0);
+        if (this->viewportMargins() != margins)
+            this->setViewportMargins(margins);
     }
 
     QFont m_baseFont;

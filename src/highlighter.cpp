@@ -238,14 +238,14 @@ void Highlighter::highlightInlines(const QString &text, int from)
         take(m.capturedStart(), m.capturedLength());
     });
 
-    static const QRegularExpression link(QStringLiteral(R"((!?\[)([^\]]*)(\]\([^)]*\)))"));
+    static const QRegularExpression link(QStringLiteral(R"((!?\[)[^\]]*(\]\([^)]*\)))"));
     each(link, text, [&](const QRegularExpressionMatch &m) {
-        if (!isFree(m.capturedStart(), m.capturedLength(1)) || !isFree(m.capturedStart(3), m.capturedLength(3)))
+        if (!isFree(m.capturedStart(), m.capturedLength(1)) || !isFree(m.capturedStart(2), m.capturedLength(2)))
             return;
         merge(m.capturedStart(1), m.capturedLength(1), m_markup);
-        merge(m.capturedStart(3), m.capturedLength(3), m_markup);
+        merge(m.capturedStart(2), m.capturedLength(2), m_markup);
         take(m.capturedStart(1), m.capturedLength(1));
-        take(m.capturedStart(3), m.capturedLength(3));
+        take(m.capturedStart(2), m.capturedLength(2));
     });
 
     // Emphasis markers must be free; bold ones are hidden from the italic
@@ -263,12 +263,12 @@ void Highlighter::highlightInlines(const QString &text, int from)
             rest.replace(close, markerLength, QString(markerLength, QChar::Null));
         });
     };
-    static const QRegularExpression boldStars(QStringLiteral(R"((?<![\\*])\*\*(?=\S)(.+?\**)(?<=\S)\*\*)"));
+    static const QRegularExpression boldStars(QStringLiteral(R"((?<![\\*])\*\*(?=\S).+?\**(?<=\S)\*\*)"));
     static const QRegularExpression boldUnderscores(
-        QStringLiteral(R"((?<![\\\w])__(?=\S)(.+?_*)(?<=\S)__(?!\w))"));
-    static const QRegularExpression italicStar(QStringLiteral(R"((?<![\\*])\*(?![\s*])(.+?)(?<![\s\\*])\*(?!\*))"));
+        QStringLiteral(R"((?<![\\\w])__(?=\S).+?_*(?<=\S)__(?!\w))"));
+    static const QRegularExpression italicStar(QStringLiteral(R"((?<![\\*])\*(?![\s*]).+?(?<![\s\\*])\*(?!\*))"));
     static const QRegularExpression italicUnderscore(
-        QStringLiteral(R"((?<![\\\w])_(?![\s_])(.+?)(?<![\s\\_])_(?!\w))"));
+        QStringLiteral(R"((?<![\\\w])_(?![\s_]).+?(?<![\s\\_])_(?!\w))"));
     emphasis(boldStars, 2);
     emphasis(boldUnderscores, 2);
     emphasis(italicStar, 1);

@@ -239,15 +239,15 @@ void MainWindow::createMenus()
     m_replaceAction = edit->addAction(tr("R&eplace…"), QKeySequence(Qt::CTRL | Qt::Key_H), m_findBar,
                                       &FindBar::showReplace);
 
-    QMenu *format = m_formatMenu = menuBar()->addMenu(tr("F&ormat"));
+    QMenu *format = menuBar()->addMenu(tr("F&ormat"));
+    m_formatMenu = format;
     const auto addFormat = [this](QMenu *menu, const QString &text, const QKeySequence &key,
                                   std::function<void(QTextCursor &)> command) {
-        QAction *action = menu->addAction(text, key, this, [this, command] {
+        m_formatActions.append(menu->addAction(text, key, this, [this, command] {
             QTextCursor cursor = m_editor->textCursor();
             command(cursor);
             m_editor->setTextCursor(cursor);
-        });
-        m_formatActions.append(action);
+        }));
     };
     const auto wrap = [](const QString &marker) {
         return [marker](QTextCursor &cursor) { formatting::toggleInline(cursor, marker); };
