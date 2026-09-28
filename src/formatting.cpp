@@ -64,6 +64,18 @@ void toggleInline(QTextCursor &cursor, const QString &marker)
     // `*` inside `**` is not an italic marker: italic runs are odd.
     const auto isMarker = [&](int run) { return run >= m && (c != QLatin1Char('*') || m != 1 || run % 2); };
 
+    // A marker closes a span when an odd number of markers precede it on its line.
+    const auto opensBefore = [&](int pos) {
+        bool open = false;
+        for (int p = doc->findBlock(pos).position(); p < pos;) {
+            const int run = runFrom(p, 1, pos);
+            if (isMarker(run))
+                open = !open;
+            p += std::max(run, 1);
+        }
+        return open;
+    };
+
     cursor.beginEditBlock();
     QTextCursor edit(doc);
     const auto remove = [&](int pos) {
@@ -82,7 +94,7 @@ void toggleInline(QTextCursor &cursor, const QString &marker)
         start -= m;
         end -= m;
     } else if (start == end && start > 0 && !doc->characterAt(start - 1).isSpace() && doc->characterAt(start - 1) != c
-               && isMarker(runFrom(end, 1, doc->characterCount()))) {
+               && isMarker(runFrom(end, 1, doc->characterCount())) && opensBefore(start)) {
         // Right before a closing marker: step over it and go on typing plain text.
         start = end += m;
     } else {
