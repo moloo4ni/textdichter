@@ -338,6 +338,10 @@ private slots:
         QTest::newRow("no step into code") << u"`"_s << u"`a` b|`c`"_s << u"`a` b`|``c`"_s;
         QTest::newRow("step out past a bullet") << u"*"_s << u"* foo *bar|*"_s << u"* foo *bar*|"_s;
         QTest::newRow("step out on the next line") << u"**"_s << u"**foo\nbar|**"_s << u"**foo\nbar**|"_s;
+        QTest::newRow("no step over an escaped span") << u"*"_s << u"a \\*b|*"_s << u"a \\*b*|**"_s;
+        QTest::newRow("no step over a span in code") << u"*"_s << u"`*a` b|*"_s << u"`*a` b*|**"_s;
+        QTest::newRow("step out past code") << u"*"_s << u"*a `*` b|*"_s << u"*a `*` b*|"_s;
+        QTest::newRow("step out of code with a backslash") << u"`"_s << u"`a\\|`"_s << u"`a\\`|"_s;
         QTest::newRow("no step past a paragraph") << u"**"_s << u"**a\n\nb|**c**"_s << u"**a\n\nb**|****c**"_s;
     }
 

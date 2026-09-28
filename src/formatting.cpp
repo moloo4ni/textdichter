@@ -65,13 +65,33 @@ void toggleInline(QTextCursor &cursor, const QString &marker)
     const auto isMarker = [&](int run) { return run >= m && (c != QLatin1Char('*') || m != 1 || run % 2); };
 
     // Whether a span is open at pos: markers since the paragraph's start, where
-    // an opening one comes before text and a closing one after it.
+    // an opening one comes before text and a closing one after it. Escaped
+    // characters and code spans are text.
+    const QChar tick(QLatin1Char('`'));
+    const auto ticksFrom = [&](int p, int limit) {
+        int run = 0;
+        while (p + run < limit && doc->characterAt(p + run) == tick)
+            ++run;
+        return run;
+    };
     const auto opensBefore = [&](int pos) {
         QTextBlock block = doc->findBlock(pos);
         while (block.previous().isValid() && !block.previous().text().trimmed().isEmpty())
             block = block.previous();
         bool open = false;
         for (int p = block.position(); p < pos;) {
+            if (doc->characterAt(p) == QLatin1Char('\\') && !(open && c == tick)) {
+                p += 2;
+                continue;
+            }
+            if (doc->characterAt(p) == tick && c != tick) {
+                const int ticks = ticksFrom(p, pos);
+                int close = p + ticks;
+                while (close < pos && !(doc->characterAt(close) == tick && ticksFrom(close, pos) == ticks))
+                    close += std::max(ticksFrom(close, pos), 1);
+                p = close < pos ? close + ticks : p + ticks;
+                continue;
+            }
             const int run = runFrom(p, 1, pos);
             const bool flanks = open ? p > 0 && !doc->characterAt(p - 1).isSpace()
                                      : !doc->characterAt(p + run).isSpace();
