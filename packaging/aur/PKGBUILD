@@ -11,7 +11,7 @@ license=('MPL-2.0')
 depends=('cmark' 'glibc' 'hicolor-icon-theme' 'libgcc' 'libstdc++' 'qt6-base' 'qt6-svg')
 makedepends=('cmake' 'ninja' 'qt6-tools')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('67a23a42af241aa2269658b050f2948c1b3b5da10830c9672994c91ca1621d27')
 
 build() {
   cmake -B build -S "$pkgname-$pkgver" -G Ninja \
