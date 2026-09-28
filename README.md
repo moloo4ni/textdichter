@@ -1,50 +1,44 @@
 # Textdichter
 
 A light, simple and clean Markdown editor for the Linux desktop.
-CommonMark only — out of the box.
+CommonMark only.
 
 ## Principles
 
-- **Plain text stays plain.** Files are pure `.md`: no front matter, no hidden
-  metadata. Encoding and line endings are preserved.
-- **Honest CommonMark.** Rendering follows the spec via its reference
-  implementation, [cmark](https://github.com/commonmark/cmark). GFM tables, task
-  lists and the like show up as plain text — exactly as the spec says.
-- **One document, one window.** Opening another file replaces the current one:
-  no tabs, no extra windows. Friendly to tiling window managers.
-- **You decide when to save.** No autosave — `Ctrl+S` writes the file.
-  Unsaved changes are marked with `•`.
-- **Native and light.** Qt Widgets and cmark. No Chromium, no web engine.
+- **Plain text stays plain.** Pure `.md` files, no hidden metadata. Encoding
+  and line endings are kept as they were.
+- **Honest CommonMark.** Rendered by the reference implementation,
+  [cmark](https://github.com/commonmark/cmark). Tables, task lists and other
+  extensions stay plain text, as the spec says.
+- **One document, one window.** No tabs, no extra windows: opening a file
+  replaces the current one. Friendly to tiling window managers.
+- **You decide when to save.** No autosave; unsaved changes are marked with `•`.
+- **Native and light.** Qt Widgets and cmark, no web engine.
 
 ## Interface
 
-A classic menu bar and a single centered column of text, 80 characters wide.
-Two modes, switched with `Ctrl+/` or *View → Preview*:
+A menu bar and a single column of text, 80 characters wide, in two modes
+(`Ctrl+/`):
 
-- **Code** — the Markdown source in a monospace font.
-- **Preview** — the rendered document, read-only, in the system font.
+- **Code** — the Markdown source, with the markup dimmed.
+- **Preview** — the rendered document, read-only.
 
-Switching modes keeps your place in the document. Shortcuts work on any
-keyboard layout.
+Switching keeps your place in the document.
 
 ## Editing
 
-- **Format menu** — bold, italic, code, links, headings (`Ctrl+1…6`), quotes,
-  lists and code blocks. Applying a format again removes it. Without a
-  selection it inserts a pair of markers to type into, and pressed again at
-  their end steps out of them.
-- **Right-click menu** — every format a click away, above the usual editing
-  commands, for working with the mouse.
-- **Lists and quotes continue** on Enter; an empty item ends the list. Tab and
-  Shift+Tab nest and unnest list items the way CommonMark expects.
-- **Pasting a URL over a selection** turns it into a link.
-- **Find and replace** in a bar at the bottom of the window (`Ctrl+F`, `Ctrl+H`).
-- **Dimmed markup** — in Code, `#`, `**`, `` ` `` and the rest of the markup are
-  dimmed, while the text stays plain: no bold, no colors, one font size.
+- The **Format** menu and the right-click menu hold bold, italic, code, links,
+  headings, quotes, lists and code blocks. Applying a format again removes it.
+- With nothing selected, a format inserts a pair of markers to type between;
+  applied again at their end, it steps out of them.
+- Lists and quotes continue on Enter; Tab and Shift+Tab nest list items.
+- Pasting a URL over a selection turns it into a link.
+- Find and replace: `Ctrl+F`, `Ctrl+H`.
 
 ## Building
 
-Requirements: Qt 6.5+ (Widgets, PrintSupport, Svg, LinguistTools), cmark, CMake 3.21+.
+Qt 6.5+ (Widgets, PrintSupport; LinguistTools for translations), cmark and
+CMake 3.21+. Qt Svg is needed at runtime for the icon.
 
 ```sh
 # Arch Linux
@@ -55,13 +49,13 @@ cmake --build build
 ./build/textdichter [file.md]
 ```
 
-`sudo cmake --install build` installs the editor with its icon and a desktop
-entry, so it shows up in the application menu and opens `.md` files.
+`sudo cmake --install build` adds the editor to the application menu and
+makes it open `.md` files.
 
 ## Status
 
-Pre-release. Everything described above works, but expect rough edges.
+Pre-release: everything above works, but expect rough edges.
 
 ## License
 
-[MPL-2.0](LICENSE).
+[MPL-2.0](LICENSE)
