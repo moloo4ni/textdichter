@@ -223,8 +223,8 @@ void MainWindow::createMenus()
         else
             m_preview->copy();
     });
-    m_pasteAction = edit->addAction(tr("&Paste"), QKeySequence::Paste, m_editor, &QPlainTextEdit::paste);
     edit->addAction(tr("Copy as &HTML"), this, &MainWindow::copyAsHtml);
+    m_pasteAction = edit->addAction(tr("&Paste"), QKeySequence::Paste, m_editor, &QPlainTextEdit::paste);
     edit->addSeparator();
     m_selectAllAction = edit->addAction(tr("Select &All"), QKeySequence::SelectAll, this, [this] {
         if (m_mode == Mode::Code)
@@ -282,13 +282,6 @@ void MainWindow::createMenus()
     connect(m_previewAction, &QAction::triggered, this,
             [this](bool checked) { setMode(checked ? Mode::Preview : Mode::Code); });
     view->addSeparator();
-    m_statusBarAction = view->addAction(tr("&Status Bar"));
-    m_statusBarAction->setCheckable(true);
-    connect(m_statusBarAction, &QAction::toggled, this, [this](bool visible) {
-        statusBar()->setVisible(visible);
-        settings().setValue(QStringLiteral("statusBar"), visible);
-    });
-    view->addSeparator();
     QAction *zoomIn = view->addAction(tr("Zoom &In"), this, [this] { setZoom(m_zoom + 1); });
     zoomIn->setShortcuts({QKeySequence::ZoomIn, QKeySequence(Qt::CTRL | Qt::Key_Equal)});
     view->addAction(tr("Zoom &Out"), QKeySequence::ZoomOut, this, [this] { setZoom(m_zoom - 1); });
@@ -296,6 +289,12 @@ void MainWindow::createMenus()
     view->addAction(tr("&Reset Zoom"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_0), this,
                     [this] { setZoom(0); });
     view->addSeparator();
+    m_statusBarAction = view->addAction(tr("&Status Bar"));
+    m_statusBarAction->setCheckable(true);
+    connect(m_statusBarAction, &QAction::toggled, this, [this](bool visible) {
+        statusBar()->setVisible(visible);
+        settings().setValue(QStringLiteral("statusBar"), visible);
+    });
     QAction *fullScreen = view->addAction(tr("&Full Screen"), QKeySequence::FullScreen, this,
                                           [this](bool on) { setWindowState(windowState().setFlag(Qt::WindowFullScreen, on)); });
     fullScreen->setCheckable(true);

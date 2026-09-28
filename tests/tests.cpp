@@ -602,6 +602,30 @@ private slots:
         QCOMPARE(editor.text(), u"- a\n- [b](https://example.org)"_s);
     }
 
+    // Items that belong together sit together, so the separators split groups
+    // of meaning.
+    void menuGroups()
+    {
+        MainWindow window;
+        const auto texts = [&](const QString &title) {
+            QStringList texts;
+            for (QAction *menu : window.menuBar()->actions()) {
+                if (menu->text() != title)
+                    continue;
+                for (QAction *action : menu->menu()->actions())
+                    texts << (action->isSeparator() ? u"-"_s : action->text());
+            }
+            return texts;
+        };
+        QCOMPARE(texts(u"&Edit"_s),
+                 (QStringList{u"&Undo"_s, u"&Redo"_s, u"-"_s, u"Cu&t"_s, u"&Copy"_s, u"Copy as &HTML"_s, u"&Paste"_s,
+                              u"-"_s, u"Select &All"_s, u"-"_s, u"&Find…"_s, u"Find &Next"_s, u"Find Pre&vious"_s,
+                              u"R&eplace…"_s}));
+        QCOMPARE(texts(u"&View"_s),
+                 (QStringList{u"&Preview"_s, u"-"_s, u"Zoom &In"_s, u"Zoom &Out"_s, u"&Reset Zoom"_s, u"-"_s,
+                              u"&Status Bar"_s, u"&Full Screen"_s}));
+    }
+
     void editorContextMenu()
     {
         MainWindow window;
