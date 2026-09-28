@@ -35,6 +35,23 @@ Switching keeps your place in the document.
 - Pasting a URL over a selection turns it into a link.
 - Find and replace: `Ctrl+F`, `Ctrl+H`.
 
+## Installing
+
+On Arch Linux, from the AUR:
+
+```sh
+paru -S textdichter
+```
+
+Elsewhere, take the tarball from the
+[latest release](https://github.com/moloo4ni/textdichter/releases/latest).
+It needs Qt 6.8 or newer with Qt Svg from your distribution. To install it
+for yourself, unpack it into `~/.local`:
+
+```sh
+tar -xzf textdichter-*-linux-x86_64.tar.gz --strip-components=1 -C ~/.local
+```
+
 ## Building
 
 Qt 6.5+ (Widgets, PrintSupport; LinguistTools for translations), cmark and

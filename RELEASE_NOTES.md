@@ -21,6 +21,6 @@ so the list of recent files starts empty.
 
 ## Installing
 
-Build from source — see
-[README](https://github.com/moloo4ni/textdichter#building). Requires Qt 6.5+,
-Qt SVG and cmark.
+On Arch Linux, from the AUR: `paru -S textdichter`. Elsewhere, the tarball
+below runs with Qt 6.8 or newer and Qt SVG from your distribution; see
+[README](https://github.com/moloo4ni/textdichter#installing).
