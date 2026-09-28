@@ -1,0 +1,30 @@
+# Maintainer: moloo4ni <moloo4ni@gmail.com>
+
+pkgname=textdichter
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='A light, simple and clean Markdown editor, CommonMark only'
+arch=('x86_64')
+url='https://github.com/moloo4ni/textdichter'
+license=('MPL-2.0')
+# qt6-svg is loaded at run time to draw the icon.
+depends=('cmark' 'glibc' 'hicolor-icon-theme' 'libgcc' 'libstdc++' 'qt6-base' 'qt6-svg')
+makedepends=('cmake' 'ninja' 'qt6-tools')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cmake -B build -S "$pkgname-$pkgver" -G Ninja \
+    -DCMAKE_BUILD_TYPE=None \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -Wno-dev
+  cmake --build build
+}
+
+check() {
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}
