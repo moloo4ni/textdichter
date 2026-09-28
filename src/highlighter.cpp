@@ -84,10 +84,15 @@ QList<Highlighter::Line> Highlighter::parse(const QString &source)
             break;
         case CMARK_NODE_HEADING: {
             // cmark ends a setext heading on the line after it, so the
-            // underline is found by its look: the first line of = or -.
-            static const QRegularExpression underline(QStringLiteral(R"(^(?: {0,3}> ?)* {0,3}(?:=+|-+)[ \t]*$)"));
+            // underline is found by its look: the first line of = or -
+            // indented at most 3 spaces past the heading's text.
+            static const QRegularExpression underline(QStringLiteral(R"(^((?: {0,3}> ?)* *)(?:=+|-+)[ \t]*$)"));
+            const auto isUnderline = [&](const QString &line) {
+                const auto match = underline.match(line);
+                return match.hasMatch() && match.capturedEnd(1) - column <= 3;
+            };
             int end = first + 1;
-            while (end <= last && !underline.match(text[end]).hasMatch())
+            while (end <= last && !isUnderline(text[end]))
                 ++end;
             if (end <= last) { // setext: the text, then a line of = or -
                 set(first, end - 1, Kind::Heading);

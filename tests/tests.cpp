@@ -333,6 +333,9 @@ private slots:
         QTest::newRow("italic out of bold italic") << u"*"_s << u"***word|***"_s << u"***word*|**"_s;
         QTest::newRow("bold out of bold italic") << u"**"_s << u"***word|***"_s << u"***word**|*"_s;
         QTest::newRow("no step over an opening marker") << u"**"_s << u"a |**b**"_s << u"a **|****b**"_s;
+        QTest::newRow("no step into bold") << u"**"_s << u"foo|**bar**"_s << u"foo**|****bar**"_s;
+        QTest::newRow("no step into italic") << u"*"_s << u"foo|*bar*"_s << u"foo*|**bar*"_s;
+        QTest::newRow("no step into code") << u"`"_s << u"`a` b|`c`"_s << u"`a` b`|``c`"_s;
     }
 
     void formatInline()
@@ -741,6 +744,16 @@ private slots:
         QVERIFY(setext[1].kind == Kind::Heading);
         QVERIFY(setext[2].kind == Kind::HeadingUnderline);
         QVERIFY(setext[3].kind == Kind::Heading);
+        // In a list item the underline is indented like the item's text.
+        const QList<Highlighter::Line> item = Highlighter::parse(u"10. Title\n    =====\n- x\n  - Sub\n    ---"_s);
+        QVERIFY(item[1].kind == Kind::HeadingUnderline);
+        QVERIFY(item[4].kind == Kind::HeadingUnderline);
+        QVERIFY(Highlighter::parse(u"> a\n> ==="_s).at(1).kind == Kind::HeadingUnderline);
+        // An indented === is part of the text, and a second one is a paragraph.
+        const QList<Highlighter::Line> lazy = Highlighter::parse(u"a\n    ===\nb\n===\n===\n"_s);
+        QVERIFY(lazy[1].kind == Kind::Heading);
+        QVERIFY(lazy[3].kind == Kind::HeadingUnderline);
+        QVERIFY(lazy[4].kind == Kind::Text);
     }
 
     void highlighterStyles()
@@ -783,6 +796,9 @@ private slots:
         cursor.setPosition(3);
         cursor.insertText(u"\n==="_s);
         QCOMPARE(dimmed(editor, doc->findBlockByNumber(1)), u"==="_s);
+
+        editor.setPlainText(u"10. Title\n    ====="_s);
+        QCOMPARE(dimmed(editor, doc->lastBlock()), u"    ====="_s);
     }
 
     void backupLifecycle()
