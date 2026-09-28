@@ -757,6 +757,10 @@ private slots:
         QVERIFY(lazy[1].kind == Kind::Heading);
         QVERIFY(lazy[3].kind == Kind::HeadingUnderline);
         QVERIFY(lazy[4].kind == Kind::Text);
+        // The underline counts from the container, not from the heading's own indent.
+        const QList<Highlighter::Line> indented = Highlighter::parse(u"   a\n     ===\n===\nz"_s);
+        QVERIFY(indented[1].kind == Kind::Heading);
+        QVERIFY(indented[2].kind == Kind::HeadingUnderline);
     }
 
     void highlighterStyles()

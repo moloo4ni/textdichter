@@ -66,6 +66,10 @@ QList<Highlighter::Line> Highlighter::parse(const QString &source)
         for (int i = from; i <= to; ++i)
             lines[i].kind = kind;
     };
+    // cmark ends a setext heading on the line that closed it, unless the
+    // document ends first, so the underline is that line or the one before.
+    QList<std::pair<int, int>> setext;
+    QList<bool> startsBlock(text.size());
 
     for (cmark_event_type event; (event = cmark_iter_next(iter)) != CMARK_EVENT_DONE;) {
         if (event != CMARK_EVENT_ENTER)
@@ -74,7 +78,10 @@ QList<Highlighter::Line> Highlighter::parse(const QString &source)
         const int first = std::clamp(cmark_node_get_start_line(node) - 1, 0, int(lines.size()) - 1);
         const int last = std::clamp(cmark_node_get_end_line(node) - 1, first, int(lines.size()) - 1);
         const int column = charColumn(text[first], cmark_node_get_start_column(node) - 1);
-        switch (cmark_node_get_type(node)) {
+        const cmark_node_type type = cmark_node_get_type(node);
+        if (type > CMARK_NODE_DOCUMENT && type <= CMARK_NODE_LAST_BLOCK)
+            startsBlock[first] = true;
+        switch (type) {
         case CMARK_NODE_BLOCK_QUOTE:
             for (int i = first; i <= last; ++i)
                 ++lines[i].quoteDepth;
@@ -82,26 +89,12 @@ QList<Highlighter::Line> Highlighter::parse(const QString &source)
         case CMARK_NODE_ITEM:
             lines[first].marker = qint16(column);
             break;
-        case CMARK_NODE_HEADING: {
-            // cmark ends a setext heading on the line after it, so the
-            // underline is found by its look: the first line of = or -
-            // indented at most 3 spaces past the heading's text.
-            static const QRegularExpression underline(QStringLiteral(R"(^((?: {0,3}> ?)* *)(?:=+|-+)[ \t]*$)"));
-            const auto isUnderline = [&](const QString &line) {
-                const auto match = underline.match(line);
-                return match.hasMatch() && match.capturedEnd(1) - column <= 3;
-            };
-            int end = first + 1;
-            while (end <= last && !isUnderline(text[end]))
-                ++end;
-            if (end <= last) { // setext: the text, then a line of = or -
-                set(first, end - 1, Kind::Heading);
-                lines[end].kind = Kind::HeadingUnderline;
-            } else {
+        case CMARK_NODE_HEADING:
+            if (last > first)
+                setext.append({first, last});
+            else
                 lines[first].kind = Kind::Heading;
-            }
             break;
-        }
         case CMARK_NODE_CODE_BLOCK: {
             set(first, last, Kind::Code);
             const auto opening = matchAt(openingFence, text[first], column);
@@ -126,6 +119,14 @@ QList<Highlighter::Line> Highlighter::parse(const QString &source)
     }
     cmark_iter_free(iter);
     cmark_node_free(root);
+
+    static const QRegularExpression underline(QStringLiteral(R"(^[ >]*(?:=+|-+)[ \t]*$)"));
+    for (auto [first, last] : setext) {
+        if (startsBlock[last] || !underline.match(text[last]).hasMatch())
+            --last;
+        set(first, last - 1, Kind::Heading);
+        lines[last].kind = Kind::HeadingUnderline;
+    }
     return lines;
 }
 
