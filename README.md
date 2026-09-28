@@ -37,10 +37,12 @@ Switching keeps your place in the document.
 
 ## Installing
 
-On Arch Linux, from the AUR:
+On Arch Linux, build a package with the PKGBUILD from this repository:
 
 ```sh
-paru -S textdichter
+git clone https://github.com/moloo4ni/textdichter
+cd textdichter/packaging/aur
+makepkg -si
 ```
 
 Elsewhere, take the tarball from the

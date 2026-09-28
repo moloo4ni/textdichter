@@ -21,6 +21,6 @@ so the list of recent files starts empty.
 
 ## Installing
 
-On Arch Linux, from the AUR: `paru -S textdichter`. Elsewhere, the tarball
-below runs with Qt 6.8 or newer and Qt SVG from your distribution; see
+The tarball below runs with Qt 6.8 or newer and Qt SVG from your
+distribution. On Arch Linux, the repository has a PKGBUILD. See
 [README](https://github.com/moloo4ni/textdichter#installing).
