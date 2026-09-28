@@ -1,21 +1,26 @@
-First pre-release of Textdichter, a light, simple and clean Markdown editor
-for the Linux desktop. Expect rough edges.
+First release of Textdichter, a light, simple and clean Markdown editor for
+the Linux desktop.
 
 ## What's inside
 
-- **Code and Preview modes** — the Markdown source in a monospace font and the
-  rendered document, switched with `Ctrl+/`. Your place in the document is kept.
+- **Code and Preview modes** — the Markdown source with the markup dimmed and
+  the rendered document, switched with `Ctrl+/`. Your place in the document is
+  kept.
 - **CommonMark only**, rendered by [cmark](https://github.com/commonmark/cmark).
-- **Format menu** — bold, italic, code, links, headings, quotes, lists and code
-  blocks.
+- **Format and right-click menus** — bold, italic, code, links, headings,
+  quotes, lists and code blocks. Applying a format again removes it or steps
+  out of it.
 - **Lists and quotes continue** on Enter; Tab and Shift+Tab nest list items.
-- **Find and replace**, **source styling**, **printing and PDF export**.
+- **Find and replace**, **HTML export**, **printing and PDF export**.
 - **Your data is safe** — changes made to the file by another program are
   noticed, and unsaved changes survive a crash.
 - English and Russian interface.
 
+If you tried the pre-release: settings now live in `~/.config/textdichter`,
+so the list of recent files starts empty.
+
 ## Installing
 
 Build from source — see
-[README](https://github.com/moloo4ni/textdichter#building). Requires Qt 6.5+
-(with Qt SVG) and cmark.
+[README](https://github.com/moloo4ni/textdichter#building). Requires Qt 6.5+,
+Qt SVG and cmark.

@@ -52,10 +52,6 @@ cmake --build build
 `sudo cmake --install build` adds the editor to the application menu and
 makes it open `.md` files.
 
-## Status
-
-Pre-release: everything above works, but expect rough edges.
-
 ## License
 
 [MPL-2.0](LICENSE)
