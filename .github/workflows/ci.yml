@@ -27,3 +27,19 @@ jobs:
       - run: ctest --test-dir build --output-on-failure
       - run: DESTDIR=staging cmake --install build
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE" && git diff --check
+
+  tarball:
+    name: Build the binary tarball on Debian 13
+    runs-on: ubuntu-24.04
+    container: debian:13
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      LC_ALL: C.UTF-8
+    steps:
+      - name: Install dependencies
+        run: >-
+          apt-get update && apt-get install -y --no-install-recommends
+          build-essential cmake ninja-build pkgconf curl ca-certificates
+          qt6-base-dev qt6-tools-dev qt6-tools-dev-tools qt6-l10n-tools libqt6svg6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - run: sh packaging/tarball.sh
