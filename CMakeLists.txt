@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets PrintSupport OPTIONAL_COMPONENTS LinguistTools Test)
 qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES ru)
+# Qt adds $ORIGIN paths for bundled libraries; there are none to find.
+unset(CMAKE_INSTALL_RPATH)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(CMARK REQUIRED IMPORTED_TARGET libcmark)
