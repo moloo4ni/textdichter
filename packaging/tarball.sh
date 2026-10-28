@@ -18,9 +18,29 @@ cmake --build "$work/cmark-build"
 cmake --install "$work/cmark-build"
 
 # Qt built with -mno-direct-extern-access, as on Arch, refuses programs built
-# without it; a Qt built without it takes them either way.
+# without it; a Qt built without it takes them either way. The flag is x86-64
+# only and spelled differently by each compiler.
+cxx=${CXX:-c++}
+command -v "$cxx" >/dev/null 2>&1 || { echo "error: C++ compiler '$cxx' not found" >&2; exit 1; }
+version=$("$cxx" --version 2>/dev/null | head -n 1 || true)
+case $version in
+    *clang*) compiler=clang ;;
+    *GCC*|*Free\ Software\ Foundation*) compiler=gcc ;;
+    *) compiler=unknown ;;
+esac
+direct_access_flag=
+if [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ]; then
+    case $compiler in
+        gcc) direct_access_flag=-mno-direct-extern-access ;;
+        clang) direct_access_flag=-fno-direct-access-external-data ;;
+        *) echo "warning: unknown C++ compiler '$cxx': not passing a direct-access flag" >&2 ;;
+    esac
+fi
+echo "tarball: compiler=$compiler flag=${direct_access_flag:-none}" >&2
+
 PKG_CONFIG_PATH="$work/cmark/lib/pkgconfig" cmake -S . -B "$work/build" -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_CXX_FLAGS=-mno-direct-extern-access
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+    -DCMAKE_CXX_COMPILER="$cxx" ${direct_access_flag:+-DCMAKE_CXX_FLAGS=$direct_access_flag}
 cmake --build "$work/build"
 ctest --test-dir "$work/build" --output-on-failure
 cmake --install "$work/build" --prefix "$work/$name" --strip

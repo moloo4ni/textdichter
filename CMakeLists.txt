@@ -4,13 +4,19 @@ project(textdichter VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets PrintSupport OPTIONAL_COMPONENTS LinguistTools Test)
+find_package(Qt6 6.7 REQUIRED COMPONENTS Widgets PrintSupport OPTIONAL_COMPONENTS LinguistTools Test)
 qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES ru)
 # Qt adds $ORIGIN paths for bundled libraries; there are none to find.
 unset(CMAKE_INSTALL_RPATH)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(CMARK REQUIRED IMPORTED_TARGET libcmark)
+find_package(cmark CONFIG QUIET)
+if(TARGET cmark::cmark)
+    set(TEXTDICHTER_CMARK cmark::cmark)
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(CMARK REQUIRED IMPORTED_TARGET libcmark)
+    set(TEXTDICHTER_CMARK PkgConfig::CMARK)
+endif()
 
 # Everything but main(), shared by the application and the tests.
 qt_add_library(textdichter_core STATIC
@@ -29,7 +35,7 @@ qt_add_library(textdichter_core STATIC
 )
 target_include_directories(textdichter_core PUBLIC src)
 target_compile_definitions(textdichter_core PUBLIC TEXTDICHTER_VERSION="${PROJECT_VERSION}")
-target_link_libraries(textdichter_core PUBLIC Qt6::Widgets Qt6::PrintSupport PkgConfig::CMARK)
+target_link_libraries(textdichter_core PUBLIC Qt6::Widgets Qt6::PrintSupport ${TEXTDICHTER_CMARK})
 
 qt_add_executable(textdichter src/main.cpp)
 target_link_libraries(textdichter PRIVATE textdichter_core)

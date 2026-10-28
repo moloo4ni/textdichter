@@ -56,7 +56,7 @@ tar -xzf textdichter-*-linux-x86_64.tar.gz --strip-components=1 -C ~/.local
 
 ## Building
 
-Qt 6.5+ (Widgets, PrintSupport; LinguistTools for translations), cmark and
+Qt 6.7+ (Widgets, PrintSupport; LinguistTools for translations), cmark and
 CMake 3.21+. Qt Svg is needed at runtime for the icon.
 
 ```sh

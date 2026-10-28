@@ -15,18 +15,158 @@ concurrency:
 
 jobs:
   build:
-    name: Build and test on Arch Linux
+    name: Build and test on Arch Linux (${{ matrix.compiler }})
     runs-on: ubuntu-24.04
     container: archlinux:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cxx: /usr/bin/g++
+          - compiler: clang
+            cxx: /usr/bin/clang++
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed base-devel cmake ninja git qt6-base qt6-svg qt6-tools cmark
+        run: >-
+          pacman -Syu --noconfirm --needed
+          base-devel cmake ninja git qt6-base qt6-svg qt6-tools cmark
+          ${{ matrix.compiler == 'clang' && 'clang' || '' }}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
       - run: cmake --build build
       - run: ctest --test-dir build --output-on-failure
       - run: DESTDIR=staging cmake --install build
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE" && git diff --check
+
+  linux-musl:
+    name: Build and test on Alpine Linux (musl, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Build and test inside Alpine
+        run: |
+          docker run --rm -i \
+            -e LC_ALL=C.UTF-8 \
+            -v "$GITHUB_WORKSPACE":/src:ro \
+            alpine:3.24 sh -eu <<'SCRIPT'
+          apk add --no-cache \
+              build-base clang22 cmake samurai pkgconf \
+              qt6-qtbase-dev qt6-qttools-dev qt6-qtsvg qt6-qttranslations \
+              cmark-dev
+
+          echo "=== environment ==="
+          cat /etc/alpine-release
+          uname -m
+          clang++ --version | head -n 1
+          cmake --version | head -n 1
+          ninja --version
+          pkg-config --modversion Qt6Core
+          pkg-config --modversion libcmark
+
+          echo "=== configure ==="
+          cmake -S /src -B /tmp/build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+              -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+
+          echo "=== compiler check ==="
+          grep -h -e CMAKE_CXX_COMPILER_ID -e CMAKE_CXX_COMPILER_VERSION \
+              /tmp/build/CMakeFiles/*/CMakeCXXCompiler.cmake
+
+          echo "=== build ==="
+          cmake --build /tmp/build
+
+          echo "=== test ==="
+          ctest --test-dir /tmp/build --output-on-failure
+
+          echo "=== install ==="
+          cmake --install /tmp/build --prefix /tmp/install
+
+          echo "=== smoke ==="
+          LC_ALL=ru_RU.UTF-8 QT_QPA_PLATFORM=offscreen /tmp/install/bin/textdichter --help \
+              | grep -q 'Лёгкий редактор'
+
+          echo "=== elf ==="
+          readelf -h /tmp/install/bin/textdichter | grep -E 'Class:|Machine:'
+          readelf -l /tmp/install/bin/textdichter | grep -F 'Requesting program interpreter'
+          readelf -l /tmp/install/bin/textdichter | grep -q 'interpreter: /lib/ld-musl-x86_64.so.1'
+          ldd /tmp/install/bin/textdichter | grep -q 'libc.musl-x86_64.so.1'
+          echo "musl runtime confirmed"
+          SCRIPT
+
+  freebsd:
+    name: Build and test on FreeBSD
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Build and test in FreeBSD 15.1
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        with:
+          release: "15.1"
+          arch: x86_64
+          sync: rsync
+          copyback: false
+          # v1.5.9 runs prepare and run with /bin/sh.
+          prepare: |
+            set -eu
+            pkg update
+            pkg install -y \
+                cmake ninja pkgconf \
+                qt6-base qt6-svg qt6-tools qt6-translations \
+                cmark
+          run: |
+            set -eu
+
+            echo "=== environment ==="
+            freebsd-version
+            uname -m
+            clang++ --version | head -n 1
+            cmake --version | head -n 1
+            ninja --version
+            pkg query '%n-%v' cmake ninja pkgconf qt6-base qt6-svg qt6-tools qt6-translations cmark
+            pkg-config --modversion Qt6Core
+            pkg-config --modversion libcmark
+
+            build_dir=/tmp/textdichter-build
+            install_dir=/tmp/textdichter-install
+            rm -rf "$build_dir" "$install_dir"
+
+            echo "=== configure ==="
+            cmake -S "$GITHUB_WORKSPACE" -B "$build_dir" -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+                -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+
+            echo "=== compiler check ==="
+            grep -h -e CMAKE_CXX_COMPILER_ID -e CMAKE_CXX_COMPILER_VERSION \
+                "$build_dir"/CMakeFiles/*/CMakeCXXCompiler.cmake
+
+            echo "=== build ==="
+            cmake --build "$build_dir"
+
+            echo "=== test ==="
+            ctest --test-dir "$build_dir" --output-on-failure
+
+            echo "=== install ==="
+            cmake --install "$build_dir" --prefix "$install_dir"
+            test -x "$install_dir/bin/textdichter"
+
+            echo "=== smoke: version ==="
+            version=$(QT_QPA_PLATFORM=offscreen "$install_dir/bin/textdichter" --version)
+            printf '%s\n' "$version"
+            test -n "$version"
+
+            echo "=== smoke: Russian help ==="
+            if ! locale -a | grep -Fqx 'ru_RU.UTF-8'; then
+                echo "error: ru_RU.UTF-8 locale is not available" >&2
+                locale -a
+                exit 1
+            fi
+            help=$(LC_ALL=ru_RU.UTF-8 QT_QPA_PLATFORM=offscreen \
+                "$install_dir/bin/textdichter" --help)
+            printf '%s\n' "$help"
+            printf '%s\n' "$help" | grep -q 'Лёгкий редактор'
 
   tarball:
     name: Build the binary tarball on Debian 13

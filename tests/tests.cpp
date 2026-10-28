@@ -814,7 +814,9 @@ private slots:
 
     void backupLifecycle()
     {
-        const QString path = u"/tmp/textdichter-test/notes.md"_s;
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(u"notes.md"_s);
         {
             Backup backup(path);
             QVERIFY(!backup.exists());
