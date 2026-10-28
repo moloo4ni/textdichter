@@ -228,7 +228,14 @@ jobs:
               locale -a
               exit 1
           fi
-          help=$(LC_ALL=ru_RU.UTF-8 QT_QPA_PLATFORM=offscreen \
+          # Qt on macOS resolves the system locale from the user's Apple
+          # language preferences (NSUserDefaults), not from the LC_ALL
+          # environment variable, so the language has to be selected through
+          # the user defaults of this ephemeral runner. The runner is a
+          # disposable VM: nothing global is touched, and the next process
+          # picks the language up.
+          defaults write NSGlobalDomain AppleLanguages -array "ru"
+          help=$(QT_QPA_PLATFORM=offscreen \
               "$install_dir/bin/textdichter" --help)
           printf '%s\n' "$help"
           printf '%s\n' "$help" | grep -q 'Лёгкий редактор'
