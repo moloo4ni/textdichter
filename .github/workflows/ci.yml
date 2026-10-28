@@ -168,6 +168,71 @@ jobs:
             printf '%s\n' "$help"
             printf '%s\n' "$help" | grep -q 'Лёгкий редактор'
 
+  macos-arm64:
+    name: Build and test on macOS (arm64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install dependencies
+        run: |
+          brew install --quiet qt cmark cmake ninja pkgconf
+      - name: Build and test on macOS
+        run: |
+          set -eu
+
+          echo "=== environment ==="
+          sw_vers
+          uname -m
+          /usr/bin/clang++ --version | head -n 1
+          cmake --version | head -n 1
+          ninja --version
+          brew --prefix qt
+          brew --prefix cmark
+          brew list --versions qt cmark
+
+          build_dir=/tmp/textdichter-macos-build
+          install_dir=/tmp/textdichter-macos-install
+          rm -rf "$build_dir" "$install_dir"
+          export PKG_CONFIG_PATH="$(brew --prefix cmark)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
+          echo "=== configure ==="
+          cmake -S "$GITHUB_WORKSPACE" -B "$build_dir" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+              -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+              -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+
+          echo "=== compiler check ==="
+          grep -h -e CMAKE_CXX_COMPILER_ID -e CMAKE_CXX_COMPILER_VERSION \
+              "$build_dir"/CMakeFiles/*/CMakeCXXCompiler.cmake
+
+          echo "=== build ==="
+          cmake --build "$build_dir"
+          test -x "$build_dir/textdichter_tests"
+
+          echo "=== test ==="
+          ctest --test-dir "$build_dir" --output-on-failure
+
+          echo "=== install ==="
+          cmake --install "$build_dir" --prefix "$install_dir"
+          test -x "$install_dir/bin/textdichter"
+
+          echo "=== smoke: version ==="
+          version=$(QT_QPA_PLATFORM=offscreen "$install_dir/bin/textdichter" --version)
+          printf '%s\n' "$version"
+          test -n "$version"
+
+          echo "=== smoke: Russian help ==="
+          if ! locale -a | grep -Fqx 'ru_RU.UTF-8'; then
+              echo "error: ru_RU.UTF-8 locale is not available" >&2
+              locale -a
+              exit 1
+          fi
+          help=$(LC_ALL=ru_RU.UTF-8 QT_QPA_PLATFORM=offscreen \
+              "$install_dir/bin/textdichter" --help)
+          printf '%s\n' "$help"
+          printf '%s\n' "$help" | grep -q 'Лёгкий редактор'
+
   tarball:
     name: Build the binary tarball on Debian 13
     runs-on: ubuntu-24.04
