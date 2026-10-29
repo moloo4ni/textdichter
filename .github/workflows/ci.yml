@@ -290,10 +290,28 @@ jobs:
           Write-Host "Visual Studio: $vsVersion"
           Write-Host "Visual Studio install path: $vsPath"
 
-          $clangCl = Get-ChildItem -Path (Join-Path $vsPath "VC\Tools\LLVM") -Recurse -Filter "clang-cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $clangCl) { exit 1 }
-          Write-Host "clang-cl: $($clangCl.FullName)"
-          & "$($clangCl.FullName)" --version
+          $clangClCandidates = @(
+              (Join-Path $vsPath 'VC\Tools\Llvm\bin\clang-cl.exe'),
+              (Join-Path $vsPath 'VC\Tools\Llvm\x64\bin\clang-cl.exe')
+          )
+          $clangCl = $null
+          foreach ($clangClCandidate in $clangClCandidates) {
+              if (!(Test-Path -LiteralPath $clangClCandidate -PathType Leaf)) { continue }
+              Write-Host "Trying clang-cl candidate: $clangClCandidate"
+              try {
+                  & "$clangClCandidate" --version
+                  if ($LASTEXITCODE -eq 0) { $clangCl = $clangClCandidate; break }
+              } catch {
+                  Write-Host "clang-cl candidate failed: $clangClCandidate -> $($_.Exception.Message)"
+              }
+          }
+          if (-not $clangCl) {
+              Write-Host "No runnable clang-cl.exe found. Checked candidates:"
+              foreach ($clangClCandidate in $clangClCandidates) { Write-Host "clang-cl candidate: $clangClCandidate -> exists: $(Test-Path -LiteralPath $clangClCandidate -PathType Leaf)" }
+              exit 1
+          }
+          Write-Host "clang-cl: $clangCl"
+          & "$clangCl" --version
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
           cmake --version
