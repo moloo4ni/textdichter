@@ -277,7 +277,14 @@ jobs:
           Write-Host "Process architecture: $processArch"
           Write-Host "Target architecture: x64"
 
-          $vswhere = "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $programFilesX86 = [Environment]::GetFolderPath(
+              [Environment+SpecialFolder]::ProgramFilesX86
+          )
+          $vswhere = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe'
+
+          if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
+              throw "vswhere.exe not found at expected path: $vswhere"
+          }
           $vsPath = ("" + (& $vswhere -latest -property installationPath -utf8)).Trim()
           $vsVersion = ("" + (& $vswhere -latest -property catalog_productDisplayVersion -utf8)).Trim()
           Write-Host "Visual Studio: $vsVersion"
