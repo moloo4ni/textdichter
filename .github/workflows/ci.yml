@@ -358,22 +358,39 @@ jobs:
           $toolset = $matches[1].Trim()
           if ($toolset -ne "ClangCL") { Write-Host "Generator toolset is not ClangCL: $toolsetLine"; exit 1 }
 
-          # Condition 2: the selected C++ compiler must be the clang-cl driver. Cache keys may
-          # carry a type suffix (e.g. CMAKE_CXX_COMPILER:FILEPATH=<path>), so parse key=value.
-          $compilerLines = @($compilerCacheLines | Where-Object { $_ -match "^CMAKE_CXX_COMPILER(:|$)" })
-          if ($compilerLines.Count -eq 0) { Write-Host "CMAKE_CXX_COMPILER not found in cache: $compilerCacheText"; exit 1 }
-          $compilerLine = $compilerLines[0]
-          if ($compilerLine -notmatch "^CMAKE_CXX_COMPILER[^=]*=(.*)") { Write-Host "Malformed CMAKE_CXX_COMPILER entry in cache: $compilerLine"; exit 1 }
-          $compilerPath = $matches[1]
-          if ((Split-Path -Path $compilerPath.Trim() -Leaf) -ne "clang-cl.exe") { Write-Host "Selected C++ compiler is not clang-cl.exe: $compilerPath"; exit 1 }
-
-          # Condition 3: the compiler ID must be Clang, read from the per-generator compiler file.
+          # Conditions 2 and 3: the compiler under test is recorded in the generated
+          # CMakeCXXCompiler.cmake metadata; the Visual Studio + ClangCL cache may not expose a
+          # compiler key, so the cache alone is not sufficient.
           $compilerIdValue = $null
+          $compilerPath = $null
           $compilerIdFiles = Get-ChildItem -Path (Join-Path $buildDir "CMakeFiles") -Recurse -Filter "CMakeCXXCompiler.cmake" -ErrorAction SilentlyContinue
           foreach ($compilerIdFile in $compilerIdFiles) {
             $content = Get-Content -Raw $compilerIdFile.FullName
-            if ($content -match "CMAKE_CXX_COMPILER_ID\s+([^\s)]+)") { $compilerIdValue = $matches[1] }
+            foreach ($compilerLine in ($content -split "`r?`n")) {
+              if ($compilerLine -notmatch "^CMAKE_CXX_COMPILER([^_]|$)") { continue }
+              $compilerKeyValue = $compilerLine.Trim()
+              $compilerParts = $compilerKeyValue -split ':', 2
+              if ($compilerParts.Count -lt 2) { continue }
+              $compilerValue = $compilerParts[1].Trim()
+              $compilerValueEqPos = $compilerValue.IndexOf('=')
+              if ($compilerValueEqPos -ge 0) { $compilerValue = $compilerValue.Substring($compilerValueEqPos + 1).Trim() }
+              if ($compilerValue -and -not $compilerPath) { $compilerPath = $compilerValue }
+            }
+            if ($content -notmatch "CMAKE_CXX_COMPILER_ID") { continue }
+            foreach ($compilerLine in ($content -split "`r?`n")) {
+              if ($compilerLine -notmatch "^CMAKE_CXX_COMPILER_ID") { continue }
+              $idKeyValue = $compilerLine.Trim()
+              $idParts = $idKeyValue -split ':', 2
+              if ($idParts.Count -lt 2) { continue }
+              $idValue = $idParts[1].Trim()
+              $idValueEqPos = $idValue.IndexOf('=')
+              if ($idValueEqPos -ge 0) { $idValue = $idValue.Substring($idValueEqPos + 1).Trim() }
+              if (-not $compilerIdValue) { $compilerIdValue = $idValue }
+            }
           }
+          if (-not $compilerPath) { Write-Host "CMAKE_CXX_COMPILER not found in generated CMake compiler metadata: $buildDir"; exit 1 }
+          if (-not (Test-Path -LiteralPath $compilerPath -PathType Leaf)) { Write-Host "Selected C++ compiler not found: $compilerPath"; exit 1 }
+          if ((Split-Path -Path $compilerPath -Leaf) -ne "clang-cl.exe") { Write-Host "Selected C++ compiler is not clang-cl.exe: $compilerPath"; exit 1 }
           if ($compilerIdValue -ne "Clang") { Write-Host "CXX compiler ID is not Clang: $compilerIdValue"; exit 1 }
 
           Write-Host "ClangCL compiler configuration confirmed: toolset=$toolset compiler=$compilerPath id=$compilerIdValue"
