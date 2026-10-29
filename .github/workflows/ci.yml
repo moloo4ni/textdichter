@@ -240,6 +240,175 @@ jobs:
           printf '%s\n' "$help"
           printf '%s\n' "$help" | grep -q 'Лёгкий редактор'
 
+  windows-x64:
+    name: Build and test on Windows (x64)
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install Qt
+        id: qt
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
+        with:
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          version: 6.11.2
+          archives: qtbase qtsvg qttools
+          cache: false
+      - name: Install cmark
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!(Test-Path "${env:VCPKG_INSTALLATION_ROOT}\vcpkg.exe")) { exit 1 }
+          & "${env:VCPKG_INSTALLATION_ROOT}\vcpkg.exe" install "cmark:x64-windows"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Show environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $osInfo = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+          Write-Host "Windows version: $($osInfo.CurrentVersion) build $($osInfo.BuildNumber)"
+          $processArch = $env:PROCESSOR_ARCHITEW6432
+          if (-not $processArch) { $processArch = $env:PROCESSOR_ARCHITEW64 }
+          if (-not $processArch) { $processArch = $env:PROCESSOR_ARCHITECTURE }
+          Write-Host "Process architecture: $processArch"
+          Write-Host "Target architecture: x64"
+
+          $vswhere = "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = ("" + (& $vswhere -latest -property installationPath -utf8)).Trim()
+          $vsVersion = ("" + (& $vswhere -latest -property catalog_productDisplayVersion -utf8)).Trim()
+          Write-Host "Visual Studio: $vsVersion"
+          Write-Host "Visual Studio install path: $vsPath"
+
+          $clangCl = Get-ChildItem -Path (Join-Path $vsPath "VC\Tools\LLVM") -Recurse -Filter "clang-cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $clangCl) { exit 1 }
+          Write-Host "clang-cl: $($clangCl.FullName)"
+          & "$($clangCl.FullName)" --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          cmake --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          ninja --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+          $qtRoot = "${{ steps.qt.outputs.qt-root-dir }}"
+          Write-Host "Qt root: $qtRoot"
+          Select-String -Path (Join-Path $qtRoot "lib\cmake\Qt6\Qt6ConfigVersion.cmake") -Pattern "Qt6_VERSION"
+
+          # qt_add_translations() in CMakeLists.txt requires the Qt6::LinguistTools
+          # component: Qt6LinguistToolsConfig.cmake plus the lupdate/lrelease tools.
+          $qtLinguistToolsConfig = Join-Path $qtRoot "lib\cmake\Qt6LinguistTools\Qt6LinguistToolsConfig.cmake"
+          if (!(Test-Path $qtLinguistToolsConfig)) { Write-Host "Qt6LinguistToolsConfig.cmake not found: $qtLinguistToolsConfig"; exit 1 }
+          Write-Host "Qt6LinguistToolsConfig.cmake found: $qtLinguistToolsConfig"
+          foreach ($qtLinguistTool in @("lupdate", "lrelease")) {
+            $qtLinguistToolExe = Join-Path $qtRoot "bin\$($qtLinguistTool).exe"
+            if (!(Test-Path $qtLinguistToolExe)) { Write-Host "Qt Linguist tool not found: $qtLinguistToolExe"; exit 1 }
+            Write-Host "Qt Linguist tool found: $qtLinguistToolExe"
+          }
+      - name: Configure
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $buildDir = "${env:RUNNER_TEMP}\textdichter-windows-build"
+          cmake -S "${env:GITHUB_WORKSPACE}" -B "$buildDir" -G "Visual Studio 17 2022" -A x64 -T ClangCL -DCMAKE_COMPILE_WARNING_AS_ERROR=ON "-DCMAKE_TOOLCHAIN_FILE=${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" "-DCMAKE_PREFIX_PATH=${{ steps.qt.outputs.qt-root-dir }}"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Show compiler
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $buildDir = "${env:RUNNER_TEMP}\textdichter-windows-build"
+          $compilerCache = Select-String -Path "$buildDir\CMakeCache.txt" -Pattern "CMAKE_CXX_COMPILER_ID|CMAKE_CXX_COMPILER_VERSION|CMAKE_CXX_COMPILER:|CMAKE_GENERATOR:|CMAKE_GENERATOR_TOOLSET:|Qt6_DIR:|cmark"
+          if (!$compilerCache) { Write-Host "CMake cache compiler info not found: $buildDir\CMakeCache.txt"; exit 1 }
+          $compilerCacheLines = @($compilerCache | ForEach-Object { $_.Line })
+          $compilerCacheText = $compilerCacheLines -join "`n"
+
+          # Condition 1: the generator toolset must be exactly ClangCL.
+          $toolsetLines = @($compilerCacheLines | Where-Object { $_ -match "^CMAKE_GENERATOR_TOOLSET" })
+          if ($toolsetLines.Count -eq 0) { Write-Host "CMAKE_GENERATOR_TOOLSET not found in cache: $compilerCacheText"; exit 1 }
+          $toolsetLine = $toolsetLines[0]
+          if ($toolsetLine -notmatch "^CMAKE_GENERATOR_TOOLSET[^=]*=(.*)") { Write-Host "Malformed CMAKE_GENERATOR_TOOLSET entry in cache: $toolsetLine"; exit 1 }
+          $toolset = $matches[1].Trim()
+          if ($toolset -ne "ClangCL") { Write-Host "Generator toolset is not ClangCL: $toolsetLine"; exit 1 }
+
+          # Condition 2: the selected C++ compiler must be the clang-cl driver. Cache keys may
+          # carry a type suffix (e.g. CMAKE_CXX_COMPILER:FILEPATH=<path>), so parse key=value.
+          $compilerLines = @($compilerCacheLines | Where-Object { $_ -match "^CMAKE_CXX_COMPILER(:|$)" })
+          if ($compilerLines.Count -eq 0) { Write-Host "CMAKE_CXX_COMPILER not found in cache: $compilerCacheText"; exit 1 }
+          $compilerLine = $compilerLines[0]
+          if ($compilerLine -notmatch "^CMAKE_CXX_COMPILER[^=]*=(.*)") { Write-Host "Malformed CMAKE_CXX_COMPILER entry in cache: $compilerLine"; exit 1 }
+          $compilerPath = $matches[1]
+          if ((Split-Path -Path $compilerPath.Trim() -Leaf) -ne "clang-cl.exe") { Write-Host "Selected C++ compiler is not clang-cl.exe: $compilerPath"; exit 1 }
+
+          # Condition 3: the compiler ID must be Clang, read from the per-generator compiler file.
+          $compilerIdValue = $null
+          $compilerIdFiles = Get-ChildItem -Path (Join-Path $buildDir "CMakeFiles") -Recurse -Filter "CMakeCXXCompiler.cmake" -ErrorAction SilentlyContinue
+          foreach ($compilerIdFile in $compilerIdFiles) {
+            $content = Get-Content -Raw $compilerIdFile.FullName
+            if ($content -match "CMAKE_CXX_COMPILER_ID\s+([^\s)]+)") { $compilerIdValue = $matches[1] }
+          }
+          if ($compilerIdValue -ne "Clang") { Write-Host "CXX compiler ID is not Clang: $compilerIdValue"; exit 1 }
+
+          Write-Host "ClangCL compiler configuration confirmed: toolset=$toolset compiler=$compilerPath id=$compilerIdValue"
+      - name: Build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cmake --build "${env:RUNNER_TEMP}\textdichter-windows-build" --config Release
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # cmark.dll ships the runtime dependency of the test binary and is not on PATH yet.
+          $env:PATH = "${env:VCPKG_INSTALLATION_ROOT}\installed\x64-windows\bin;$env:PATH"
+          ctest --test-dir "${env:RUNNER_TEMP}\textdichter-windows-build" -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Install
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cmake --install "${env:RUNNER_TEMP}\textdichter-windows-build" --config Release --prefix "${env:RUNNER_TEMP}\textdichter-windows-install"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Check installed executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "${env:RUNNER_TEMP}\textdichter-windows-install\bin\textdichter.exe"
+          if (!(Test-Path $exe)) { Write-Host "textdichter.exe was not installed"; exit 1 }
+          Write-Host "Installed executable: $exe"
+      - name: "Smoke: version"
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:PATH = "${env:VCPKG_INSTALLATION_ROOT}\installed\x64-windows\bin;$env:PATH"
+          $qtRoot = "${{ steps.qt.outputs.qt-root-dir }}"
+          $exe = "${env:RUNNER_TEMP}\textdichter-windows-install\bin\textdichter.exe"
+          if (!(Test-Path (Join-Path $qtRoot "bin\Qt6Core.dll"))) { exit 1 }
+          if (!(Test-Path (Join-Path $qtRoot "plugins\platforms\offscreen"))) { exit 1 }
+          if (!(Test-Path "${env:VCPKG_INSTALLATION_ROOT}\installed\x64-windows\bin\cmark.dll")) { exit 1 }
+          $versionOutput = & $exe --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $versionText = $versionOutput | Out-String
+          Write-Host $versionText
+          if ($versionText -notmatch "1\.0\.0") { exit 1 }
+      - name: "Smoke: help"
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:PATH = "${env:VCPKG_INSTALLATION_ROOT}\installed\x64-windows\bin;$env:PATH"
+          $exe = "${env:RUNNER_TEMP}\textdichter-windows-install\bin\textdichter.exe"
+          $helpOutput = & $exe --help
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $helpText = $helpOutput | Out-String
+          Write-Host $helpText
+          # The GitHub windows runner uses the English locale, so the help
+          # output checked here is the expected English original string.
+          if ($helpText -notmatch "Usage") { exit 1 }
+
   tarball:
     name: Build the binary tarball on Debian 13
     runs-on: ubuntu-24.04
